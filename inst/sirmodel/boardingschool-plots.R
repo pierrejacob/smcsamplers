@@ -76,7 +76,7 @@ ridgescale <- 1
 gridges <- ggplot()
 gridges <- gridges + xlab(expression(phi[inv])) + ylab("# observations")
 gridges <- gridges + geom_ridgeline(data=df_hist %>% filter(component == 3), aes(x = exp(x), y = ndata, height = height, group = ndata),
-                                    alpha = 0.5, col = 'grey', fill = 'grey', size = 0.2)
+                                    alpha = 0.5, col = colours[2], fill = colours[2], size = 0.2)
 gridges <- gridges + scale_y_continuous(breaks = c(3,7,11,14)) + xlim(0,1)
 gridges <- gridges + coord_flip()
 gridges

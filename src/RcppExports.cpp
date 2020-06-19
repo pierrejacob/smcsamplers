@@ -8,7 +8,7 @@ using namespace Rcpp;
 
 // coxprocess_loglikelihood
 NumericVector coxprocess_loglikelihood(const NumericMatrix& x, const IntegerVector& counts, double area);
-RcppExport SEXP _temperingsmc_coxprocess_loglikelihood(SEXP xSEXP, SEXP countsSEXP, SEXP areaSEXP) {
+RcppExport SEXP _smcsamplers_coxprocess_loglikelihood(SEXP xSEXP, SEXP countsSEXP, SEXP areaSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -19,9 +19,51 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// pgg_m_sigma_
+Rcpp::List pgg_m_sigma_(const Eigen::Map<Eigen::MatrixXd>& omega, const Eigen::Map<Eigen::MatrixXd>& X, const Eigen::Map<Eigen::MatrixXd>& invB, const Eigen::Map<Eigen::VectorXd>& KTkappaplusinvBtimesb);
+RcppExport SEXP _smcsamplers_pgg_m_sigma_(SEXP omegaSEXP, SEXP XSEXP, SEXP invBSEXP, SEXP KTkappaplusinvBtimesbSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type omega(omegaSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type invB(invBSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type KTkappaplusinvBtimesb(KTkappaplusinvBtimesbSEXP);
+    rcpp_result_gen = Rcpp::wrap(pgg_m_sigma_(omega, X, invB, KTkappaplusinvBtimesb));
+    return rcpp_result_gen;
+END_RCPP
+}
+// logistic_loglikelihood_gradient
+Rcpp::List logistic_loglikelihood_gradient(const Eigen::MatrixXd& betas, const Eigen::ArrayXd& Y, const Eigen::MatrixXd& X);
+RcppExport SEXP _smcsamplers_logistic_loglikelihood_gradient(SEXP betasSEXP, SEXP YSEXP, SEXP XSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Eigen::MatrixXd& >::type betas(betasSEXP);
+    Rcpp::traits::input_parameter< const Eigen::ArrayXd& >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< const Eigen::MatrixXd& >::type X(XSEXP);
+    rcpp_result_gen = Rcpp::wrap(logistic_loglikelihood_gradient(betas, Y, X));
+    return rcpp_result_gen;
+END_RCPP
+}
+// logistic_loglikelihood_gradient_temperlast
+List logistic_loglikelihood_gradient_temperlast(const Eigen::MatrixXd& betas, const Eigen::ArrayXd& Y, const Eigen::MatrixXd& X, int delta, double gamma);
+RcppExport SEXP _smcsamplers_logistic_loglikelihood_gradient_temperlast(SEXP betasSEXP, SEXP YSEXP, SEXP XSEXP, SEXP deltaSEXP, SEXP gammaSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Eigen::MatrixXd& >::type betas(betasSEXP);
+    Rcpp::traits::input_parameter< const Eigen::ArrayXd& >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< const Eigen::MatrixXd& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< int >::type delta(deltaSEXP);
+    Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
+    rcpp_result_gen = Rcpp::wrap(logistic_loglikelihood_gradient_temperlast(betas, Y, X, delta, gamma));
+    return rcpp_result_gen;
+END_RCPP
+}
 // eigenMapMatMult
 SEXP eigenMapMatMult(const Eigen::Map<Eigen::MatrixXd> A, Eigen::Map<Eigen::MatrixXd> B);
-RcppExport SEXP _temperingsmc_eigenMapMatMult(SEXP ASEXP, SEXP BSEXP) {
+RcppExport SEXP _smcsamplers_eigenMapMatMult(SEXP ASEXP, SEXP BSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -33,7 +75,7 @@ END_RCPP
 }
 // dmvnorm_
 NumericVector dmvnorm_(const NumericMatrix& x, const NumericVector& mean, const NumericMatrix& covariance);
-RcppExport SEXP _temperingsmc_dmvnorm_(SEXP xSEXP, SEXP meanSEXP, SEXP covarianceSEXP) {
+RcppExport SEXP _smcsamplers_dmvnorm_(SEXP xSEXP, SEXP meanSEXP, SEXP covarianceSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -46,7 +88,7 @@ END_RCPP
 }
 // dmvnorm_cholesky_inverse
 NumericVector dmvnorm_cholesky_inverse(const NumericMatrix& x, const NumericVector& mean, const Eigen::MatrixXd& cholesky_inverse);
-RcppExport SEXP _temperingsmc_dmvnorm_cholesky_inverse(SEXP xSEXP, SEXP meanSEXP, SEXP cholesky_inverseSEXP) {
+RcppExport SEXP _smcsamplers_dmvnorm_cholesky_inverse(SEXP xSEXP, SEXP meanSEXP, SEXP cholesky_inverseSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -59,7 +101,7 @@ END_RCPP
 }
 // grad_dmvnorm_precision
 NumericMatrix grad_dmvnorm_precision(const NumericMatrix& x, const NumericVector& mean, const NumericMatrix& precision);
-RcppExport SEXP _temperingsmc_grad_dmvnorm_precision(SEXP xSEXP, SEXP meanSEXP, SEXP precisionSEXP) {
+RcppExport SEXP _smcsamplers_grad_dmvnorm_precision(SEXP xSEXP, SEXP meanSEXP, SEXP precisionSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -70,9 +112,23 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// eval_and_grad_dmvnorm_precision
+List eval_and_grad_dmvnorm_precision(const NumericMatrix& x, const NumericVector& mean, const NumericMatrix& precision, const Eigen::MatrixXd& cholesky_inverse);
+RcppExport SEXP _smcsamplers_eval_and_grad_dmvnorm_precision(SEXP xSEXP, SEXP meanSEXP, SEXP precisionSEXP, SEXP cholesky_inverseSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const NumericMatrix& >::type x(xSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type mean(meanSEXP);
+    Rcpp::traits::input_parameter< const NumericMatrix& >::type precision(precisionSEXP);
+    Rcpp::traits::input_parameter< const Eigen::MatrixXd& >::type cholesky_inverse(cholesky_inverseSEXP);
+    rcpp_result_gen = Rcpp::wrap(eval_and_grad_dmvnorm_precision(x, mean, precision, cholesky_inverse));
+    return rcpp_result_gen;
+END_RCPP
+}
 // rmvnorm_
 NumericMatrix rmvnorm_(int nsamples, const NumericVector& mean, const NumericMatrix& covariance);
-RcppExport SEXP _temperingsmc_rmvnorm_(SEXP nsamplesSEXP, SEXP meanSEXP, SEXP covarianceSEXP) {
+RcppExport SEXP _smcsamplers_rmvnorm_(SEXP nsamplesSEXP, SEXP meanSEXP, SEXP covarianceSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -85,7 +141,7 @@ END_RCPP
 }
 // rmvnorm_cholesky_
 NumericMatrix rmvnorm_cholesky_(int nsamples, const NumericVector& mean, const Eigen::MatrixXd& cholesky);
-RcppExport SEXP _temperingsmc_rmvnorm_cholesky_(SEXP nsamplesSEXP, SEXP meanSEXP, SEXP choleskySEXP) {
+RcppExport SEXP _smcsamplers_rmvnorm_cholesky_(SEXP nsamplesSEXP, SEXP meanSEXP, SEXP choleskySEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -98,7 +154,7 @@ END_RCPP
 }
 // dmvstudent_t_cholesky_inverse
 NumericVector dmvstudent_t_cholesky_inverse(const NumericMatrix& x, const double& degree, const NumericVector& mean, const Eigen::MatrixXd& cholesky_inverse, const double& constant, const double& factor);
-RcppExport SEXP _temperingsmc_dmvstudent_t_cholesky_inverse(SEXP xSEXP, SEXP degreeSEXP, SEXP meanSEXP, SEXP cholesky_inverseSEXP, SEXP constantSEXP, SEXP factorSEXP) {
+RcppExport SEXP _smcsamplers_dmvstudent_t_cholesky_inverse(SEXP xSEXP, SEXP degreeSEXP, SEXP meanSEXP, SEXP cholesky_inverseSEXP, SEXP constantSEXP, SEXP factorSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -114,7 +170,7 @@ END_RCPP
 }
 // grad_dmvstudent_t
 NumericMatrix grad_dmvstudent_t(const NumericMatrix& x, const double& degree, const NumericVector& mean, const NumericMatrix& precision, const double& factor);
-RcppExport SEXP _temperingsmc_grad_dmvstudent_t(SEXP xSEXP, SEXP degreeSEXP, SEXP meanSEXP, SEXP precisionSEXP, SEXP factorSEXP) {
+RcppExport SEXP _smcsamplers_grad_dmvstudent_t(SEXP xSEXP, SEXP degreeSEXP, SEXP meanSEXP, SEXP precisionSEXP, SEXP factorSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -129,7 +185,7 @@ END_RCPP
 }
 // systematic_resampling
 IntegerVector systematic_resampling(const NumericVector& weights, int ndraws, double u);
-RcppExport SEXP _temperingsmc_systematic_resampling(SEXP weightsSEXP, SEXP ndrawsSEXP, SEXP uSEXP) {
+RcppExport SEXP _smcsamplers_systematic_resampling(SEXP weightsSEXP, SEXP ndrawsSEXP, SEXP uSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -142,20 +198,24 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_temperingsmc_coxprocess_loglikelihood", (DL_FUNC) &_temperingsmc_coxprocess_loglikelihood, 3},
-    {"_temperingsmc_eigenMapMatMult", (DL_FUNC) &_temperingsmc_eigenMapMatMult, 2},
-    {"_temperingsmc_dmvnorm_", (DL_FUNC) &_temperingsmc_dmvnorm_, 3},
-    {"_temperingsmc_dmvnorm_cholesky_inverse", (DL_FUNC) &_temperingsmc_dmvnorm_cholesky_inverse, 3},
-    {"_temperingsmc_grad_dmvnorm_precision", (DL_FUNC) &_temperingsmc_grad_dmvnorm_precision, 3},
-    {"_temperingsmc_rmvnorm_", (DL_FUNC) &_temperingsmc_rmvnorm_, 3},
-    {"_temperingsmc_rmvnorm_cholesky_", (DL_FUNC) &_temperingsmc_rmvnorm_cholesky_, 3},
-    {"_temperingsmc_dmvstudent_t_cholesky_inverse", (DL_FUNC) &_temperingsmc_dmvstudent_t_cholesky_inverse, 6},
-    {"_temperingsmc_grad_dmvstudent_t", (DL_FUNC) &_temperingsmc_grad_dmvstudent_t, 5},
-    {"_temperingsmc_systematic_resampling", (DL_FUNC) &_temperingsmc_systematic_resampling, 3},
+    {"_smcsamplers_coxprocess_loglikelihood", (DL_FUNC) &_smcsamplers_coxprocess_loglikelihood, 3},
+    {"_smcsamplers_pgg_m_sigma_", (DL_FUNC) &_smcsamplers_pgg_m_sigma_, 4},
+    {"_smcsamplers_logistic_loglikelihood_gradient", (DL_FUNC) &_smcsamplers_logistic_loglikelihood_gradient, 3},
+    {"_smcsamplers_logistic_loglikelihood_gradient_temperlast", (DL_FUNC) &_smcsamplers_logistic_loglikelihood_gradient_temperlast, 5},
+    {"_smcsamplers_eigenMapMatMult", (DL_FUNC) &_smcsamplers_eigenMapMatMult, 2},
+    {"_smcsamplers_dmvnorm_", (DL_FUNC) &_smcsamplers_dmvnorm_, 3},
+    {"_smcsamplers_dmvnorm_cholesky_inverse", (DL_FUNC) &_smcsamplers_dmvnorm_cholesky_inverse, 3},
+    {"_smcsamplers_grad_dmvnorm_precision", (DL_FUNC) &_smcsamplers_grad_dmvnorm_precision, 3},
+    {"_smcsamplers_eval_and_grad_dmvnorm_precision", (DL_FUNC) &_smcsamplers_eval_and_grad_dmvnorm_precision, 4},
+    {"_smcsamplers_rmvnorm_", (DL_FUNC) &_smcsamplers_rmvnorm_, 3},
+    {"_smcsamplers_rmvnorm_cholesky_", (DL_FUNC) &_smcsamplers_rmvnorm_cholesky_, 3},
+    {"_smcsamplers_dmvstudent_t_cholesky_inverse", (DL_FUNC) &_smcsamplers_dmvstudent_t_cholesky_inverse, 6},
+    {"_smcsamplers_grad_dmvstudent_t", (DL_FUNC) &_smcsamplers_grad_dmvstudent_t, 5},
+    {"_smcsamplers_systematic_resampling", (DL_FUNC) &_smcsamplers_systematic_resampling, 3},
     {NULL, NULL, 0}
 };
 
-RcppExport void R_init_temperingsmc(DllInfo *dll) {
+RcppExport void R_init_smcsamplers(DllInfo *dll) {
     R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
     R_useDynamicSymbols(dll, FALSE);
 }

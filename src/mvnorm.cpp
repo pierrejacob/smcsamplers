@@ -48,7 +48,7 @@ NumericMatrix grad_dmvnorm_precision(const NumericMatrix & x, const NumericVecto
   NumericMatrix output(N,d);
   for (int n = 0; n < N; ++n){
     for(int i = 0; i < d; ++i){
-      double total = 0;
+      double total = 0.;
       for(int j = 0; j <d; ++j){
         total += (mean(j) - x(n,j)) * precision(i,j);
       }
@@ -56,6 +56,31 @@ NumericMatrix grad_dmvnorm_precision(const NumericMatrix & x, const NumericVecto
     }
   }
   return(output);
+}
+
+
+// [[Rcpp::export]]
+List eval_and_grad_dmvnorm_precision(const NumericMatrix & x, const NumericVector & mean, const NumericMatrix & precision, const Eigen::MatrixXd & cholesky_inverse) {
+  int N = x.nrow(), d = x.ncol();
+  double halflogdeterminant = cholesky_inverse.diagonal().array().log().sum();;
+  double cst = - (-halflogdeterminant) - (d * 0.9189385);
+  NumericMatrix gradoutput(N,d);
+  NumericVector logoutput(N);
+  for (int n = 0; n < N; ++n){
+    for(int i = 0; i < d; ++i){
+      double total = 0.;
+      for(int j = 0; j <d; ++j){
+        total += (mean(j) - x(n,j)) * precision(i,j);
+      }
+      gradoutput(n,i) = total;
+    }
+    logoutput(n) = 0.;
+    for(int i = 0; i < d; ++i){
+      logoutput(n) += gradoutput(n,i) * (mean(i) - x(n,i));
+    }
+    logoutput(n) = cst - 0.5 * logoutput(n);
+  }
+  return(List::create(Named("grad") = gradoutput, Named("eval") = logoutput));
 }
 
 // [[Rcpp::export]]

@@ -1,9 +1,9 @@
-Package: temperingsmc
+Package: smcsamplers
 Type: Package
 Title: Sequential Monte Carlo samplers
 Version: 0.1.0
-Author: Chenguang Dai, Jeremy Heng, Pierre E. Jacob
-Maintainer: Pierre E. Jacob <pjacob@fas.harvard.edu>
+Author: Anonymous
+Maintainer: Anonymous <anonymous@mail>
 Description: Sequential Monte Carlo samplers
 License: GPL (>= 2)
 Depends:
@@ -11,5 +11,5 @@ Depends:
 Imports:
     Rcpp (>= 0.11.6),RcppEigen
 LinkingTo: Rcpp, RcppEigen
-RoxygenNote: 6.1.1
+RoxygenNote: 7.1.0
 LazyData: true

@@ -8,3 +8,4 @@ SEXP eigenMapMatMult(const Eigen::Map<Eigen::MatrixXd> A, Eigen::Map<Eigen::Matr
 
     return Rcpp::wrap(C);
 }
+

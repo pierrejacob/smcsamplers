@@ -67,7 +67,7 @@ gnsteps <- ggplot(df_ %>% filter(case != "fixed N & d steps") %>% group_by(dimen
        aes(x = dimension, y = meannsteps, group = interaction(case), colour = case, linetype = case))
 gnsteps <- gnsteps + geom_line(size = linesize)
 gnsteps <- gnsteps + scale_color_manual(name = '', values = colours[1:2]) + ylab("# steps")
-gnsteps <- gnsteps + scale_linetype_discrete(name = "")
+gnsteps <- gnsteps + scale_linetype_discrete(name = "") + geom_rangeframe()
 gnsteps <- gnsteps + scale_x_continuous(breaks = dimensions)
 gnsteps
 ggsave(filename = "experiments/mvnorm/nsteps.pdf", plot = gnsteps, width = plotwidth, height = plotheight)

@@ -59,6 +59,9 @@ laplace_df <- lapply(1:length(laplace.files), function(ifile){
              elapsedtime = elapsedtime)
 }) %>% bind_rows()
 
+load(file = paste0("experiments/logistic/", laplace.files[1]))
+laplace_df %>% head
+
 gess <- ggplot(laplace_df, aes(x = n, y = 100* ess/smctuning$nparticles, group = rep)) + geom_point() +
   ylab("ESS %") + xlab("# observations") + scale_x_continuous(breaks = c(1e4, 5e4, 1e5)) +
   ylim(99, 100) + geom_rangeframe()

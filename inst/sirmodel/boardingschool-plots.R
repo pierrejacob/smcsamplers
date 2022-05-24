@@ -1,7 +1,6 @@
+rm(list = ls())
 library(smcsamplers)
 graphsettings <- set_custom_theme()
-library(ggridges)
-library(ggthemes)
 theme_set(theme_tufte(ticks = TRUE))
 theme_update(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),
              axis.title.x = element_text(size = 25, margin = margin(20, 0, 0, 0), hjust = 1),
@@ -10,8 +9,6 @@ theme_update(axis.text.x = element_text(size = 20), axis.text.y = element_text(s
              legend.title = element_text(size = 20), title = element_text(size = 30),
              strip.text = element_text(size = 25), strip.background = element_rect(fill = "white"),
              legend.position = "bottom")
-
-library(gridExtra)
 set.seed(3) # for reproductibility
 library(outbreaks)
 library(tidyverse)
@@ -34,23 +31,6 @@ load("experiments/sirmodel/boardingschool-smc-partial.RData")
 xhistory <- smc_partial_results[[4]]
 length(xhistory)
 
-# iobs <- 7
-# xparticles <- xhistory[[iobs-2]]
-# load(paste0("experiments/sirmodel/boardingschool-stan-ndays", iobs, ".RData"))
-# stanresults <- standf %>% select(gamma, beta, phi_inv)
-#
-# par(mfrow = c(3,1))
-# hist(xparticles[1,], prob = T, col = rgb(1,1,0,0.5), nclass = 50, main = paste0("day ", iobs))
-# hist(log(stanresults$gamma), add = T, prob = T, col = rgb(1,0,0,0.5), nclass = 150)
-#
-# hist(xparticles[2,], prob = T, col = rgb(1,1,0,0.5), nclass = 50, main = '')
-# hist(log(stanresults$beta), add = T, prob = T, col = rgb(1,0,0,0.5), nclass = 150)
-#
-# hist(xparticles[3,], prob = T, col = rgb(1,1,0,0.5), nclass = 50, main = '')
-# hist(log(standf$phi_inv), add = T, prob = T, col = rgb(1,0,0,0.5), nclass = 150)
-
-## ridge plot
-library(ggridges)
 df_hist <- data.frame()
 # for (time in 1:2){
 for (ndata in 1:length(xhistory)){
@@ -62,15 +42,6 @@ for (ndata in 1:length(xhistory)){
   }
 }
 df_hist %>% tail
-ridgescale <- .25
-gridges <- ggplot()
-gridges <- gridges + xlab(expression(theta)) + ylab("# observations")
-gridges <- gridges + geom_ridgeline(data=df_hist, aes(x = x, y = ndata, height = height, group = ndata),
-                                    alpha = 0.3, col = colours[2], fill = colours[2])
-# gridges <- gridges + scale_y_continuous(breaks = delta * (0:(14))) + xlim(-5,5)
-gridges <- gridges + coord_flip()
-gridges <- gridges + facet_wrap(~ component, scales = 'free', ncol = 1)
-gridges
 
 ridgescale <- 1
 gridges <- ggplot()
@@ -81,11 +52,8 @@ gridges <- gridges + scale_y_continuous(breaks = c(3,7,11,14)) + xlim(0,1)
 gridges <- gridges + coord_flip()
 gridges
 ggsave(filename = "experiments/sirmodel/boardingschool.partial.phiinv.pdf", plot = gridges, width = 7, height = 5)
-  # ggplot(data=df_hist, aes(x = x, y = height, group = ndata)) + geom_line(alpha = 1) +
-#   facet_wrap(~ component, scales = 'free', ncol = 1)
 
 ##
-
 df_moments <- lapply(1:length(smc_partial_results), function(index){
   xhistory <- smc_partial_results[[index]]
   df_moments_ <- data.frame()
@@ -129,17 +97,31 @@ gpoints <- gpoints + guides(col = guide_colorbar(nbin = 5))
 gpoints
 # ggsave(filename = "experiments/sirmodel/boardingschool.partial.points.pdf", plot = gpoints, width = 7, height = 5)
 
-gcont <- ggplot(pointsdf, aes(x = exp(X1), y = exp(X2), group = ndata)) +
-  stat_density_2d(aes(contour = ..level.., fill = ndata), bins = 3, geom = 'polygon', colour = 'black', size = 0.1) +
-  scale_fill_gradient2(name = "# observations", midpoint = mean(pointsdf$ndata),
+gcont <- ggplot(pointsdf %>% filter(ndata == 3), aes(x = exp(X1), y = exp(X2), group = ndata)) +
+  stat_density_2d(aes(fill = ndata), bins = 2, geom = 'polygon', colour = 'black', size = 0.1) +
+  stat_density_2d(data = pointsdf %>% filter(ndata == 4), aes(fill = ndata), bins = 2, geom = 'polygon', colour = 'black', size = 0.1) +
+  stat_density_2d(data = pointsdf %>% filter(ndata == 5), aes(fill = ndata), bins = 2, geom = 'polygon', colour = 'black', size = 0.1) +
+  stat_density_2d(data = pointsdf %>% filter(ndata == 6), aes(fill = ndata), bins = 2, geom = 'polygon', colour = 'black', size = 0.1) +
+  stat_density_2d(data = pointsdf %>% filter(ndata == 7), aes(fill = ndata), bins = 2, geom = 'polygon', colour = 'black', size = 0.1) +
+  stat_density_2d(data = pointsdf %>% filter(ndata == 8), aes(fill = ndata), bins = 2, geom = 'polygon', colour = 'black', size = 0.1) +
+  stat_density_2d(data = pointsdf %>% filter(ndata == 9), aes(fill = ndata), bins = 2, geom = 'polygon', colour = 'black', size = 0.1) +
+  stat_density_2d(data = pointsdf %>% filter(ndata == 10), aes(fill = ndata), bins = 2, geom = 'polygon', colour = 'black', size = 0.1) +
+  stat_density_2d(data = pointsdf %>% filter(ndata == 11), aes(fill = ndata), bins = 2, geom = 'polygon', colour = 'black', size = 0.1) +
+  stat_density_2d(data = pointsdf %>% filter(ndata == 12), aes(fill = ndata), bins = 2, geom = 'polygon', colour = 'black', size = 0.1) +
+  stat_density_2d(data = pointsdf %>% filter(ndata == 13), aes(fill = ndata), bins = 2, geom = 'polygon', colour = 'black', size = 0.1) +
+  stat_density_2d(data = pointsdf %>% filter(ndata == 14), aes(fill = ndata), bins = 2, geom = 'polygon', colour = 'black', size = 0.1)
+## I am aware that the above code looks offensive, but couldn't make anything else work
+gcont <- gcont +  scale_fill_gradient2(name = "# observations", midpoint = mean(pointsdf$ndata),
                         low = "antiquewhite3", mid = "white", high = "cornflowerblue",
                         breaks = c(3,7,11,14))
-  # scale_fill_continuous()
-# gcont <- gcont + xlim(-1,2) + ylim(0,3)
 gcont <- gcont + xlab(expression(gamma)) + ylab(expression(beta))
-gcont <- gcont + theme(legend.key.width = unit(1.5,"cm"))
+gcont <- gcont + theme(legend.key.width = unit(1.5, "cm"))
 gcont <- gcont + guides(col = guide_colorbar(nbin = 5))
+gcont <- gcont  +  scale_fill_gradient2(name = "# observations", midpoint = mean(pointsdf$ndata),
+                       low = "antiquewhite3", mid = "white", high = "cornflowerblue",
+                       breaks = c(3,7,11,14))
 gcont
+
 ggsave(filename = "experiments/sirmodel/boardingschool.partial.contours.pdf", plot = gcont, width = 7, height = 5)
 
 
@@ -150,8 +132,3 @@ gzhat <- gzhat + ylab("log marginal likelihood")
 gzhat
 ggsave(filename = "experiments/sirmodel/boardingschool.partial.logz.pdf", plot = gzhat, width = 7, height = 5)
 
-# ggplot(pointsdf, aes(x = X1, y = X2, colour = factor(ndata))) + geom_point() +
-#   viridis::scale_color_viridis(discrete = T)
-#
-# ggplot(pointsdf, aes(x = X1, y = X2, colour = factor(ndata))) + geom_density_2d() +
-#   viridis::scale_color_viridis(discrete = T)

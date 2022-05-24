@@ -7,7 +7,7 @@ Maintainer: Pierre E. Jacob <pierre.jacob.work@gmail.com>
 Description: Reproduces the figures in https://arxiv.org/abs/2007.11936}
 License: GPL (>= 2)
 Depends:
-    Rcpp (>= 0.11.6), RcppEigen, tidyverse, doParallel, doRNG, ggplot2, ggridges, ggthemes, lubridate, cobs
+    Rcpp (>= 0.11.6), RcppEigen, tidyverse, doParallel, doRNG, ggridges, ggthemes, gridExtra, lubridate, cobs
 Imports:
 LinkingTo: Rcpp, RcppEigen
 RoxygenNote: 7.1.2

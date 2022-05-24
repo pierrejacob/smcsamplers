@@ -1,8 +1,5 @@
 # https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html#3_scaling_up_ode-based_models
-library(smcsamplers)
-graphsettings <- set_custom_theme()
 library(rstan)
-library(gridExtra)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores()-2)
 set.seed(3) # for reproductibility
@@ -81,7 +78,6 @@ generated quantities {
 "
 
 library(outbreaks)
-library(tidyverse)
 # time series of cases
 cases <- influenza_england_1978_school$in_bed # Number of students in bed
 write(stan_model_string, file = "sirmodel.stan")
@@ -107,6 +103,9 @@ get_data_sir <- function(n_days){
 
 ## start by doing MCMC targeting posterior distribution given 3 observations
 fit_ <- sampling(sir_mod, data = get_data_sir(3), iter = 2, chains = 1)
+library(smcsamplers)
+graphsettings <- set_custom_theme()
+
 ## define target distribution
 get_sir_targetdist <- function(fit_){
   gradlogtarget_ <- function(x) grad_log_prob(fit_, x)
@@ -194,20 +193,6 @@ info_mcmc_df <- lapply(2:length(results$lambdas), function(ilambda) {
 }) %>% bind_rows()
 info_mcmc_df
 ##
-# gar <- ggplot(info_mcmc_df, aes(x = ilambda, y = ar)) + geom_point()
-# gar <- gar + xlab("step") + ylab("acceptance rate") + ylim(0,1) + geom_rangeframe()
-# gsqjd <- ggplot(info_mcmc_df, aes(x = ilambda, y = sqjd)) + geom_point()
-# gsqjd <- gsqjd + xlab("step") + ylab("relative jumping distance") + geom_rangeframe()
-# gridExtra::grid.arrange(gar, gsqjd, nrow = 2)
-# hist(chain[1,], prob = T, nclass = 50)
-# hist(log(standf$gamma), add = T, prob = T, col = rgb(1,0,0,0.5), nclass = 50)
-# hist(results$particles$x[1,], add = T, prob = T, col = rgb(1,1,0,0.5), nclass = 50)
-# hist(chain[2,], prob = T, nclass = 50)
-# hist(log(standf$beta), add = T, prob = T, col = rgb(1,0,0,0.5), nclass = 50)
-# hist(results$particles$x[2,], add = T, prob = T, col = rgb(1,1,0,0.5), nclass = 50)
-# hist(chain[3,], prob = T, nclass = 50)
-# hist(log(standf$phi_inv), add = T, prob = T, col = rgb(1,0,0,0.5), nclass = 50)
-# hist(results$particles$x[3,], add = T, prob = T, col = rgb(1,1,0,0.5), nclass = 50)
 
 ## it seems to work so
 ## we will follow a path of distributions
@@ -222,8 +207,6 @@ smctuning <- list(nparticles = 2^9, ess_criterion = 0.5, nmoves = 2)
 smctuning$stepsize <- 0.1
 smctuning$nleapfrog <- ceiling(1/smctuning$stepsize)
 nrep <- 5
-library(doParallel)
-library(doRNG)
 registerDoParallel(cores = 6)
 
 smc_partial_results <- foreach(irep = 1:nrep) %dorng% {
@@ -253,26 +236,4 @@ smc_partial_results <- foreach(irep = 1:nrep) %dorng% {
 ##
 save(smctuning, smc_partial_results, nrep, file = "experiments/sirmodel/boardingschool-smc-partial.RData")
 #
-# xhistory <- smc_partial_results[[1]]
-# par(mfrow = c(2,1))
-# matplot(t(sapply(xhistory, rowMeans)), type = "l")
-# ##
-# matplot(t(sapply(xhistory, function(v) apply(v, 1, sd))), type = "l", log = 'y')
-#
-# iobs <- 10
-#
-# xparticles <- xhistory[[iobs-2]]
-#
-# load(paste0("experiments/sirmodel/boardingschool-stan-ndays", iobs, ".RData"))
-# stanresults <- standf %>% select(gamma, beta, phi_inv)
-#
-# par(mfrow = c(3,1))
-# hist(xparticles[1,], prob = T, col = rgb(1,1,0,0.5), nclass = 50)
-# hist(log(stanresults$gamma), add = T, prob = T, col = rgb(1,0,0,0.5), nclass = 50)
-#
-# hist(xparticles[2,], prob = T, col = rgb(1,1,0,0.5), nclass = 50)
-# hist(log(stanresults$beta), add = T, prob = T, col = rgb(1,0,0,0.5), nclass = 50)
-#
-# hist(xparticles[3,], prob = T, col = rgb(1,1,0,0.5), nclass = 50)
-# hist(log(standf$phi_inv), add = T, prob = T, col = rgb(1,0,0,0.5), nclass = 50)
 

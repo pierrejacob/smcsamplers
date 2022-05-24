@@ -10,7 +10,7 @@ This is not a general-purpose statistical software. This is just a
 collection of scripts intended to reproduce the figures of a paper. Use
 at your own risk!
 
-The folder inst/README.R describes which scripts generate which figures.
+The file inst/README.R describes which scripts generate which figures.
 
 ### Installation
 
@@ -22,5 +22,33 @@ devtools::install_github("pierrejacob/smcsamplers")
 ```
 
 It depends on the packages `Rcpp`, `RcppEigen`, `tidyverse`,
-`doParallel`, `doRNG`, `ggplot2`, `ggridges`, `ggthemes`, which are all
-on CRAN.
+`doParallel`, `doRNG`, `ggridges`, `ggthemes`, `gridExtra`, `lubridate`,
+`cobs` which are all on CRAN. You can also run the following code to
+install the ones you miss.
+
+``` r
+if (!require("Rcpp")) install.packages("Rcpp")
+if (!require("RcppEigen")) install.packages("RcppEigen")
+if (!require("tidyverse")) install.packages("tidyverse")
+if (!require("doParallel")) install.packages("doParallel")
+if (!require("doRNG")) install.packages("doRNG")
+if (!require("ggridges")) install.packages("ggridges")
+if (!require("ggthemes")) install.packages("ggthemes")
+if (!require("gridExtra")) install.packages("gridExtra")
+if (!require("lubridate")) install.packages("lubridate")
+if (!require("cobs")) install.packages("cobs")
+```
+
+Furthermore, the SIR example requires `outbreaks` and `rstan`:
+
+``` r
+if (!require("outbreaks")) install.packages("outbreaks")
+if (!require("rstan")) install.packages("rstan")
+```
+
+The “path of least effort” example on logistic regression requires the
+`pgdraw` package:
+
+``` r
+if (!require("pgdraw")) install.packages("pgdraw")
+```

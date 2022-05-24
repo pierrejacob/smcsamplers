@@ -116,4 +116,8 @@ gpathpartial
 ggsave(filename = "experiments/logistic/path.partial.pdf", plot = gpathpartial, width = plotwidth, height = plotheight)
 
 
+icomp <- 10
+tail(path.hmc.df %>% filter(component == icomp, time == max(path.hmc.df$time)))
+tail(path.partial.df%>% filter(component == icomp,  time == max(path.partial.df$time)))
+tail(path.pgg.df %>% filter(component == icomp,  time == max(path.pgg.df$time)))
 

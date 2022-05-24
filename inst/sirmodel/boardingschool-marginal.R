@@ -1,8 +1,5 @@
 # https://mc-stan.org/users/documentation/case-studies/boarding_school_case_study.html#3_scaling_up_ode-based_models
-library(smcsamplers)
-graphsettings <- set_custom_theme()
 library(rstan)
-library(gridExtra)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores ())
 set.seed(3) # for reproductibility
@@ -104,6 +101,8 @@ get_data_sir <- function(n_days, t0 = 0){
   return(data_sir)
 }
 
+library(smcsamplers)
+graphsettings <- set_custom_theme()
 
 ## define functions for SMC samplers
 get_sir_targetdist <- function(fit_){
@@ -171,7 +170,6 @@ for (it0 in seq_along(t0s)){
   smcresults_list[[it0]] <- smcresults
 }
 ##
-# save(smcresults_list, file = paste0("boardingschool-marginal-t0.RData"))
 
 resultsdf <- data.frame()
 for (it0 in seq_along(t0s)){
@@ -186,15 +184,5 @@ save(t0s, nrep, resultsdf, smctuning, file = "experiments/sirmodel/boardingschoo
 head(resultsdf)
 ggplot(resultsdf, aes(x = t0, y = zhat)) + geom_point() + xlab(expression(t[0])) + ylab("Z hat")
 
-# resultsdf <- data.frame()
-# for (it0 in seq_along(t0s)){
-#   t0 <- t0s[it0]
-#   sres <- smcresults_list[[it0]]
-#   nsteps <- sapply(sres, function(x) length(x$xhistory))
-#   resultsdf <- rbind(resultsdf, data.frame(t0 = t0, nsteps = nsteps, irep = 1:nrep))
-# }
-#
-# head(resultsdf)
-# # ggplot(resultsdf, aes(x = t0, y = nsteps)) + geom_point() + xlab(expression(t[0])) + ylab("nsteps")
 
 

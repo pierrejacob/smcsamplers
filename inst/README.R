@@ -36,17 +36,19 @@ source("inst/logistic/covtype_averagepartial.R") # creates covtype.partial.avera
 source("inst/logistic/covtype_averagepartial_plots.R")
 
 ## For Laplace approximations in Supplementary Material S7
+## the code requires numDeriv
+if (!require("numDeriv")) install.packages("numDeriv")
 source("inst/logistic/covtype_laplace.R") # creates covtype.laplace.n*.RData
 source("inst/logistic/covtype_laplace_plots.R") # creates plots
 
-## For the SIR model,
+#### SIR model on the boarding school data set ####
 ## the code requires 'outbreaks', 'rstan'
 if (!require("outbreaks")) install.packages("outbreaks")
 if (!require("rstan")) install.packages("rstan")
-
+## run
 source("inst/sirmodel/boardingschool-smc-partialposteriors.R") # creates boardingschool-smc-partial.RData
 source("inst/sirmodel/boardingschool-marginal.R") # creates boardingschool-smc-marginal.RData
-## the plots are created with
+## the four plots of Figure 3 are created with
 source("inst/sirmodel/boardingschool-plots.R")
 
 ## For the results with multivariate Normals in the Supplementary Materials

@@ -6,12 +6,12 @@
 \alias{smcsamplers}
 \title{smcsamplers}
 \description{
-...
+Sequential Monte Carlo samplers
 }
 \details{
-...
+Reproduces the figures in \url{https://arxiv.org/abs/2007.11936}
 }
 \author{
-anonymous <anonymous@anonymous.com>
+Pierre E. Jacob <pierre.jacob.work@gmail.com>
 }
 \keyword{package}

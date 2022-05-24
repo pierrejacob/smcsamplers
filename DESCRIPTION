@@ -1,14 +1,14 @@
 Package: smcsamplers
 Type: Package
 Title: Sequential Monte Carlo samplers
-Version: 0.1.0
+Version: 0.1.1
 Author: Anonymous
-Maintainer: Anonymous <anonymous@mail>
+Maintainer: Pierre E. Jacob <pierre.jacob.work@gmail.com>
 Description: Sequential Monte Carlo samplers
 License: GPL (>= 2)
 Depends:
     Rcpp (>= 0.11.6), RcppEigen, tidyverse, doParallel, doRNG, ggplot2, ggridges, ggthemes
 Imports:
 LinkingTo: Rcpp, RcppEigen
-RoxygenNote: 7.1.0
+RoxygenNote: 7.1.2
 LazyData: true

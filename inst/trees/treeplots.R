@@ -1,9 +1,11 @@
 rm(list=ls())
 set.seed(1)
 library(smcsamplers)
-library(tidyverse)
+if (!require("igraph")) install.packages("igraph")
 library(igraph)
+if (!require("ggraph")) install.packages("ggraph")
 library(ggraph)
+if (!require("gridExtra")) install.packages("gridExtra")
 graphsettings <- set_custom_theme()
 set.seed(3)
 

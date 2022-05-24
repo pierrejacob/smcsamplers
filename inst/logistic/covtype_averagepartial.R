@@ -1,20 +1,7 @@
 rm(list = ls())
 library(smcsamplers)
 set.seed(1)
-library(tidyverse)
-library(doParallel)
-library(doRNG)
 registerDoParallel(cores = detectCores()-2)
-library(ggridges)
-library(ggthemes)
-theme_set(theme_tufte(ticks = TRUE))
-theme_update(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),
-             axis.title.x = element_text(size = 25, margin = margin(20, 0, 0, 0), hjust = 1),
-             axis.title.y = element_text(size = 25, angle = 90, margin = margin(0, 20, 0, 0), vjust = 1),
-             legend.text = element_text(size = 20),
-             legend.title = element_text(size = 20), title = element_text(size = 30),
-             strip.text = element_text(size = 25), strip.background = element_rect(fill = "white"),
-             legend.position = "bottom")
 
 load("experiments/logistic/covtype.processed.RData")
 trainingset <- rbind(trainingset, testset)
@@ -57,7 +44,7 @@ smc_hmc_nonadaptive <- function(smctuning, targetdist, initdist, initparticles){
     mlw <- max(incrweight)
     log_ratio_normconst <- c(log_ratio_normconst, mlw + log(sum(nweights * exp(incrweight - mlw))))
     logweights <- logweights + incrweight
-    nweights <- PET::normalize_weight(logweights)$nw
+    nweights <- smcsamplers::normalize_weight(logweights)$nw
     ess_realized <- c(ess_realized, 1/sum(nweights^2))
     estimated_variances <- diag(smctuning$variances[[istep+1]])
     ## set mass "matrix" as inverse of variance (here only consider diagonal elements)
@@ -216,30 +203,10 @@ b <- matrix(0, nrow = p, ncol = 1)
 B <- diag(10, p, p)
 priordist <- get_mvnormal_diag(b[,1], diag(B))
 
-##
-# load(file = "experiments/logistic/covtype.smcpartial.RData")
-# smc_partial_results[[1]]$xmeans_history
-# path.partial.df <- data.frame()
-# for (rep in 1:length(smc_partial_results)){
-#   nsteps <- length(smc_partial_results[[rep]]$xmeans_history)
-#   path.partial.df <- rbind(path.partial.df, lapply(1:nsteps, function(time){
-#     data.frame(component = 1:p,
-#                mean = smc_partial_results[[rep]]$xmeans_history[[time]],
-#                var = smc_partial_results[[rep]]$xvars_history[[time]],
-#                rep = rep,
-#                time = time,
-#                ndata = (time - 1) * delta)
-#   }) %>% bind_rows())
-# }
-# tail(path.partial.df)
-# ggplot(path.partial.df, aes(x = mean, y = var, group = interaction(component, rep))) +
-#   geom_path() + scale_y_log10() + geom_rangeframe()
-
 ####
 smctuning <- list(nparticles = 2^7, ess_criterion = 0.5, nmoves = 1)
 smctuning$stepsize <- 0.3 * p^{-1/4}
 smctuning$nleapfrog <- 3
-load("experiments/logistic/covtype.smcpartial.RData")
 ###
 ndataseq <- c(0, 25, 50, 100, 250, 500)
 ndata_ <- ndataseq[2]
@@ -264,7 +231,6 @@ unbiased_results <- foreach(irep = 1:nrep[2]) %dorng% {
     return(list(logpdf = pr$logpdf + ll$logls, gradlogpdf = pr$gradlogpdf + ll$gradients))
   }
   initdist <- get_mvnormal(initmean, initvar)
-  # initparticles <- initmean + sqrt(initvar) * matrix(rnorm(p*smctuning$nparticles), nrow = p)
   initparticles <- initdist$generate(smctuning$nparticles)
   asmc_results <- asmc_hmc(smctuning, targetdist, initdist$eval, initparticles)
   ##
@@ -282,7 +248,6 @@ sapply(unbiased_results, function(x) x$nsteps)
 umean_history <- list()
 uvar_history <- list()
 
-# apply(sapply(unbiased_results, function(x) x$unbiased_moment1), 1, sd)
 moment1 <- rowMeans(sapply(unbiased_results, function(x) x$unbiased_moment1))
 moment2 <- apply(simplify2array(lapply(unbiased_results, function(x) x$unbiased_moment2)), c(1,2), mean)
 variance <- moment2 - matrix(moment1, ncol = 1) %*% t(moment1)
@@ -343,8 +308,6 @@ for (iobs in 3:length(ndataseq)){
   moment2 <- apply(simplify2array(lapply(unbiased_results, function(x) x$unbiased_moment2)), c(1,2), mean)
   initmean <- moment1
   initvar <- moment2 - matrix(moment1, ncol = 1) %*% t(moment1)
-  # umean_history[[iobs]] <- initmean
-  # uvar_history[[iobs]] <- initvar
   print(sapply(unbiased_results, function(x) x$meetingtime))
   print(sapply(unbiased_results, function(x) x$nsteps))
   for (iboot in 1:nboot){
@@ -360,52 +323,6 @@ for (iobs in 3:length(ndataseq)){
   }
 }
 
-# nsteps <- length(umean_history)
-
-# upath.df <- lapply(1:nsteps, function(time){
-#   data.frame(component = 1:p,
-#              mean = umean_history[[time]],
-#              var = diag(uvar_history[[time]]),
-#              time = time,
-#              ndata = ndataseq[time])
-# }) %>% bind_rows()
-
 results.df %>% tail
 
 save(results.df, smctuning, ndataseq, nrep, file = "experiments/logistic/covtype.partial.average.RData")
-
-ggplot(results.df, aes(x = mean, y = var, group = interaction(component, rep))) +
-  geom_path() + scale_y_log10() + geom_rangeframe()
-
-# ggplot(path.partial.df, aes(x = mean, y = var, group = interaction(component, rep))) +
-#   geom_path() + scale_y_log10() + geom_rangeframe() +
-#   geom_path(data=upath.df, aes(x = mean, y = var, group = interaction(component)),
-#             colour = 'red')
-# load("experiments/logistic/covtype.smctempering.RData")
-# path.hmc.df <- data.frame()
-# for (rep in 1:length(smc_hmc_results)){
-#   nsteps <- length(smc_hmc_results[[rep]]$lambdas)
-#   path.hmc.df <- rbind(path.hmc.df, lapply(1:nsteps, function(time){
-#     data.frame(component = 1:p,
-#                mean = smc_hmc_results[[rep]]$xmeans_history[[time]],
-#                var = smc_hmc_results[[rep]]$xvars_history[[time]],
-#                rep = rep,
-#                time = time)
-#   }) %>% bind_rows())
-# }
-#
-# ggplot(path.hmc.df, aes(x = mean, y = var, group = interaction(component, rep))) +
-#   geom_path() + scale_y_log10() + geom_rangeframe() +
-#   geom_path(data=upath.df, aes(x = mean, y = var, group = interaction(component)),
-#             colour = 'red')
-#
-# load("experiments/logistic/covtype.laplace.n1e+05.RData")
-# xlaplace <- smc_results_laplace[[1]]$xhistory
-# xlaplace <- xlaplace[[length(xlaplace)]]
-# rowMeans(xlaplace)
-# diag(cov(t(xlaplace)))
-# ggplot(upath.df, aes(x = mean, y = var, group = interaction(component))) +
-#   geom_path() + scale_y_log10() + geom_rangeframe() +
-#   geom_point(data = data.frame(mean = rowMeans(xlaplace),
-#                                var = diag(cov(t(xlaplace)))*100), aes(group = NULL))
-

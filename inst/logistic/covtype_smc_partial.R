@@ -1,9 +1,6 @@
 rm(list = ls())
 library(smcsamplers)
 set.seed(1)
-library(tidyverse)
-library(doParallel)
-library(doRNG)
 registerDoParallel(cores = detectCores()-2)
 load("experiments/logistic/covtype.processed.RData")
 #
@@ -87,7 +84,6 @@ asmc_hmc_chunk <- function(smctuning, particles, logweights, roots, nstart, delt
     ## Cholesky decomposition
     mass_chol <- sqrt(mass_matrix)
     ## compute effective sample size
-    ## compute effective sample size
     ess_realized <- c(ess_realized, 1/sum(nweights$nw^2))
     ## compute normalizing constant ratio estimator
     log_ratio_normconst <- c(log_ratio_normconst, nweights$avew)
@@ -106,13 +102,6 @@ asmc_hmc_chunk <- function(smctuning, particles, logweights, roots, nstart, delt
       particles$target$logpdf <- particles$target$logpdf[ancestors]
       particles$target$gradlogpdf <- particles$target$gradlogpdf[,ancestors,drop=F]
       logweights <- rep(0, particles$n)
-      ## MCMC move at current lambda
-      # accept_rate_ <- 0
-      # for (imove in 1:smctuning$nmoves){
-        # hmc_res <- hmc_kernel_chunk(particles, smctuning, Y[1:n_next], X[1:n_next,], delta, lambda_current)
-        # particles <- hmc_res$particles
-        # accept_rate_ <- accept_rate_ + hmc_res$accept_rate
-      # }
       ## HMC move targeting distribution corresponding to next lambda
       info <- list()
       for (imove in 1:smctuning$nmoves){
@@ -154,8 +143,6 @@ asmc_hmc_chunk <- function(smctuning, particles, logweights, roots, nstart, delt
         info[[imove]] <- list(ar = mean(accepts), sqjd = sqjd)
       }
       infos_mcmc[[length(infos_mcmc)+1]] <- info
-      # cat("assimilating data from", nstart, "to", nstart+delta, "; current lambda =", lambda_current, "\n")
-      # cat("HMC mean acceptance", accept_rate_ / smctuning$nmoves, "\n")
     }
   }
   return(list(particles = particles, logweights = logweights, lambdas = lambdas,
@@ -176,8 +163,6 @@ asmc_hmc_partial <- function(smctuning, delta, Y, X, b, B){
   particles$n <- smctuning$nparticles
   particles$x <- initparticles
   particles$d <- dim(particles$x)[1]
-  # particles$init <- initdist(particles$x)
-  # particles$target <- targetdist(particles$x)
   logweights <- rep(0, particles$n)
   ##
   istep <- 1
@@ -228,13 +213,6 @@ smctuning$nleapfrog <- ceiling(1/smctuning$stepsize)
 
 delta <- 10
 ndataseq <- seq(from = 0, to = length(Y), by = delta)
-
-# smc_partial_results <- asmc_hmc_partial(smctuning, delta, Y, X, b, B)
-# # plot(cumsum(smc_partial_results$log_ratio_normconst))
-# # length(smc_partial_results$xmeans_history)
-# smc_partial_results$nroots
-# smc_partial_results$lambdas_list
-# smc_partial_results$infos_mcmc_list[1:4]
 
 nrep <- 10
 smc_partial_results <- foreach(irep = 1:nrep) %dorng% {

@@ -27,4 +27,5 @@ if (!require("devtools")) install.packages("devtools")
 devtools::install_github("pierrejacob/smcsamplers")
 ```
 
-It depends on the packages `Rcpp`, `RcppEigen`, `tidyverse`, `doParallel`, `doRNG`, `ggplot2`, `ggridges`, `ggthemes`, which are all on CRAN.
+It depends on the packages `Rcpp`, `RcppEigen`, `tidyverse`, `doParallel`, `doRNG`, `ggplot2`, `ggridges`, `ggthemes`, `lubridate`, `cobs`
+which are all on CRAN.

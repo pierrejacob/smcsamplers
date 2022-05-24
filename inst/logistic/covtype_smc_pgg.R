@@ -1,13 +1,7 @@
 ### logistic regression with covtype data set
-### path of least effort
-### we could compute squared jumping distance to monitor performance of MCMC steps
 rm(list = ls())
 library(smcsamplers)
 set.seed(1)
-library(tidyverse)
-## gg ridges for the evolution of marginals
-library(doParallel)
-library(doRNG)
 registerDoParallel(cores = detectCores()-2)
 load("experiments/logistic/covtype.processed.RData")
 #
@@ -110,7 +104,6 @@ asmc_pgg <- function(smctuning){
     Yxbeta_sums <- colSums(Y * xbeta)
     ess_deltalambda <- function(lambda){
       logw <- (lambda - lambda_current) * Yxbeta_sums - colSums(log(1 + exp(lambda * xbeta)) - log(1 + exp(lambda_current * xbeta)))
-      # return(1/sum(PET::normalize_weight(logw)$nw^2))
       return(1/sum(smcsamplers::normalize_weight(logw)$nw^2))
     }
     if (ess_deltalambda(1) > smctuning$ess_criterion * smctuning$nparticles){
@@ -148,7 +141,6 @@ asmc_pgg <- function(smctuning){
     }
     infos_mcmc[[istep]] <- info
     istep <- istep + 1
-    # xhistory[[istep]] <- particles$x
     ## store mean and variance
     xmeans_history[[istep]] <- estimated_means
     xvars_history[[istep]] <- estimated_variances
@@ -159,7 +151,6 @@ asmc_pgg <- function(smctuning){
   return(list(particles = particles, lambdas = lambdas, log_ratio_normconst = log_ratio_normconst,
               ess_ = ess_, elapsedtime = elapsedtime, roots = roots, nroots = nroots,
               xmeans_history = xmeans_history, xvars_history = xvars_history, infos_mcmc = infos_mcmc))
-              #xhistory = xhistory, roots = roots))
 }
 
 ##

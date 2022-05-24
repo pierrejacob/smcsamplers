@@ -1,11 +1,7 @@
 rm(list = ls())
 library(smcsamplers)
-library(ggplot2)
 set.seed(1)
-library(dplyr)
 ## gg ridges for the evolution of marginals
-library(ggridges)
-library(ggthemes)
 theme_set(theme_tufte(ticks = TRUE))
 theme_update(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),
              axis.title.x = element_text(size = 25, margin = margin(20, 0, 0, 0), hjust = 1),
@@ -15,9 +11,6 @@ theme_update(axis.text.x = element_text(size = 20), axis.text.y = element_text(s
              strip.text = element_text(size = 25), strip.background = element_rect(fill = "white"),
              legend.position = "bottom")
 
-library(reshape2)
-library(doParallel)
-library(doRNG)
 registerDoParallel(cores = detectCores()-2)
 colours <- c("black", "cornflowerblue", "antiquewhite3")
 
@@ -32,25 +25,11 @@ gpath <- gpath + scale_x_continuous(breaks = c(-1,0,1))
 gpath <- gpath + geom_point(aes(colour = ndata))
 gpath <- gpath + scale_color_gradient2(name = "# obs", midpoint = 250,
                                              mid = rgb(.2,0.05,0.2), low = colours[3], high = colours[2], breaks = c(0,500))
-# +
-  # viridis::scale_color_viridis(name = '# observations', discrete=F, breaks = c(0,500))
 gpath <- gpath +  theme(legend.key.width = unit(1.,"cm"))
 gpath <- gpath + guides(colour = guide_colorbar(title.vjust=1))
 gpath
 ggsave(filename = "experiments/logistic/path.partialaverage.pdf", plot = gpath,
        width = 8, height = 8)
-
-gpath <- ggplot(results.df, aes(x = mean, y = var, group = interaction(component, rep))) +
-  geom_path(alpha = 0.1, size = linesize) + geom_rangeframe()
-gpath <- gpath + geom_path(size = linesize) + scale_y_log10()
-gpath <- gpath + xlab("mean") + ylab("variance")
-gpath <- gpath + scale_x_continuous(breaks = c(-1,0,1))
-gpath <- gpath + geom_point(aes(colour = ndata))
-gpath <- gpath + scale_color_gradient2(low = "antiquewhite3", mid = "white", midpoint = 250, high = "cornflowerblue", breaks = c(0,500))
-  # viridis::scale_color_viridis(name = '# observations', discrete=F, breaks = c(0,500))
-gpath <- gpath +  theme(legend.key.width = unit(1.,"cm"))
-gpath <- gpath + guides(colour = guide_colorbar(title.vjust=1))
-gpath
 
 
 

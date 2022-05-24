@@ -1,11 +1,7 @@
 rm(list = ls())
 library(smcsamplers)
-library(ggplot2)
 set.seed(1)
-library(dplyr)
 ## gg ridges for the evolution of marginals
-library(ggridges)
-library(ggthemes)
 theme_set(theme_tufte(ticks = TRUE))
 theme_update(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),
              axis.title.x = element_text(size = 25, margin = margin(20, 0, 0, 0), hjust = 1),
@@ -15,9 +11,6 @@ theme_update(axis.text.x = element_text(size = 20), axis.text.y = element_text(s
              strip.text = element_text(size = 25), strip.background = element_rect(fill = "white"),
              legend.position = "bottom")
 
-library(reshape2)
-library(doParallel)
-library(doRNG)
 registerDoParallel(cores = detectCores()-2)
 
 colours <- c("black", "cornflowerblue", "antiquewhite3")
@@ -117,54 +110,10 @@ gpathpartial <- gpathpartial + geom_point(aes(colour = ndata))
 
 gpathpartial <- gpathpartial + scale_color_gradient2(name = "# obs", midpoint = 500,
                                              mid = rgb(.2,0.05,0.2), low = colours[3], high = colours[2], breaks = c(0,1000))
-# +  viridis::scale_color_viridis(name = "# obs", discrete=F, breaks = c(0,1000)) #+ theme(legend.position = 'none')
 gpathpartial <- gpathpartial +  theme(legend.key.width = unit(1.,"cm"))
 gpathpartial <- gpathpartial + guides(colour = guide_colorbar(title.vjust=1))
 gpathpartial
 ggsave(filename = "experiments/logistic/path.partial.pdf", plot = gpathpartial, width = plotwidth, height = plotheight)
 
-
-
-# ## agreement on final time
-# ggplot(path.pgg.df %>% filter(time == max(time)),
-#        aes(x = component, y = mean)) + geom_point(position = position_jitter()) +
-#   geom_point(data = path.hmc.df %>% filter(time == max(time)), colour = 'red', alpha = 0.5, position = position_jitter()) +
-#   geom_point(data = path.partial.df %>% filter(time == max(time)), colour = 'blue', alpha = 0.5, position = position_jitter())
-#
-# ggplot(path.pgg.df %>% filter(time == max(time)),
-#        aes(x = component, y = var)) + geom_point(position = position_jitter()) +
-#   geom_point(data = path.hmc.df %>% filter(time == max(time)), colour = 'red', alpha = 0.5, position = position_jitter()) +
-#   geom_point(data = path.partial.df %>% filter(time == max(time)), colour = 'blue', alpha = 0.5, position = position_jitter()) +
-#   scale_y_log10()
-
-# ## performance of MCMC moves
-# ## get information about how the MCMC steps performed
-# hmcperf.df <- data.frame()
-# for (rep in 1:length(smc_hmc_results)){
-#   info_mcmc_df <- lapply(2:length(smc_hmc_results[[rep]]$lambdas), function(ilambda) {
-#     info_mcmc <- smc_hmc_results[[rep]]$infos_mcmc[[ilambda-1]]
-#     df_ <- data.frame(ilambda = ilambda, imove = 1:length(info_mcmc),
-#                       sqjd = sapply(info_mcmc, function(x) x$sqjd))
-#   }) %>% bind_rows()
-#   hmcperf.df <- rbind(hmcperf.df, info_mcmc_df %>% mutate(rep = rep))
-# }
-# ##
-# gsqjd <- ggplot(hmcperf.df, aes(x = ilambda, y = sqjd)) + geom_point()
-# gsqjd <- gsqjd + xlab("step") + ylab("relative jumping distance") + geom_rangeframe()
-# gsqjd
-#
-# pggperf.df <- data.frame()
-# for (rep in 1:length(smc_hmc_results)){
-#   info_mcmc_df <- lapply(2:length(asmc_pgg_results[[rep]]$lambdas), function(ilambda) {
-#     info_mcmc <- asmc_pgg_results[[rep]]$infos_mcmc[[ilambda-1]]
-#     df_ <- data.frame(ilambda = ilambda, imove = 1:length(info_mcmc),
-#                       sqjd = sapply(info_mcmc, function(x) x$sqjd))
-#   }) %>% bind_rows()
-#   pggperf.df <- rbind(pggperf.df, info_mcmc_df %>% mutate(rep = rep))
-# }
-# ##
-# gsqjd <- ggplot(pggperf.df, aes(x = ilambda, y = sqjd)) + geom_point()
-# gsqjd <- gsqjd + xlab("step") + ylab("relative jumping distance") + geom_rangeframe()
-# gsqjd
 
 

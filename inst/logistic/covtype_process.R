@@ -29,4 +29,4 @@ xxnumeric <- xxnumeric[permut,]
 trainingset <- xxnumeric[1:4e5,]
 testset <- xxnumeric[(4e5+1):dim(xxnumeric)[1],]
 
-save(trainingset, testset, file = "~/Downloads/covtype.processed.RData")
+save(trainingset, testset, file = "experiments/logistic/covtype.processed.RData")

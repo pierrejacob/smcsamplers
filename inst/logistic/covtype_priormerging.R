@@ -64,7 +64,7 @@ asmc_hmc_chunk <- function(smctuning, particles, logweights, roots, nstart, delt
       search_results <- smcsamplers::search_lambda(lambda_current, ess_deltalambda, smctuning$ess_criterion * smctuning$nparticles)
       lambda_next <- search_results$x
     }
-    ##
+    ## compute incremental weights
     logwincremental <- (lambda_next - lambda_current) * logliks$logls
     logwincremental[is.na(logwincremental)] <- -Inf
     logweights <- logweights + logwincremental
@@ -79,7 +79,6 @@ asmc_hmc_chunk <- function(smctuning, particles, logweights, roots, nstart, delt
     mass_matrix <- 1/estimated_variances
     ## Cholesky decomposition
     mass_chol <- sqrt(mass_matrix)
-    ## compute effective sample size
     ## compute effective sample size
     ess_realized <- c(ess_realized, 1/sum(nweights$nw^2))
     ## compute normalizing constant ratio estimator
@@ -99,13 +98,6 @@ asmc_hmc_chunk <- function(smctuning, particles, logweights, roots, nstart, delt
       particles$target$logpdf <- particles$target$logpdf[ancestors]
       particles$target$gradlogpdf <- particles$target$gradlogpdf[,ancestors,drop=F]
       logweights <- rep(0, particles$n)
-      ## MCMC move at current lambda
-      # accept_rate_ <- 0
-      # for (imove in 1:smctuning$nmoves){
-      # hmc_res <- hmc_kernel_chunk(particles, smctuning, Y[1:n_next], X[1:n_next,], delta, lambda_current)
-      # particles <- hmc_res$particles
-      # accept_rate_ <- accept_rate_ + hmc_res$accept_rate
-      # }
       ## HMC move targeting distribution corresponding to next lambda
       info <- list()
       for (imove in 1:smctuning$nmoves){
@@ -147,8 +139,6 @@ asmc_hmc_chunk <- function(smctuning, particles, logweights, roots, nstart, delt
         info[[imove]] <- list(ar = mean(accepts), sqjd = sqjd)
       }
       infos_mcmc[[length(infos_mcmc)+1]] <- info
-      # cat("assimilating data from", nstart, "to", nstart+delta, "; current lambda =", lambda_current, "\n")
-      # cat("HMC mean acceptance", accept_rate_ / smctuning$nmoves, "\n")
     }
   }
   return(list(particles = particles, logweights = logweights, lambdas = lambdas,
@@ -169,10 +159,7 @@ asmc_hmc_partial <- function(smctuning, delta, Y, X, b, B){
   particles$n <- smctuning$nparticles
   particles$x <- initparticles
   particles$d <- dim(particles$x)[1]
-  # particles$init <- initdist(particles$x)
-  # particles$target <- targetdist(particles$x)
   logweights <- rep(0, particles$n)
-  ##
   istep <- 1
   xmeans_history <- list()
   xvars_history <- list()
@@ -183,7 +170,7 @@ asmc_hmc_partial <- function(smctuning, delta, Y, X, b, B){
   log_ratio_normconst <- c()
   roots <- 1:particles$n
   nroots <- particles$n
-  ##
+  ## store quantities computed at each step
   xhistory <- list()
   xhistory[[1]] <- particles$x
   whistory <- list()
@@ -221,34 +208,27 @@ asmc_hmc_partial <- function(smctuning, delta, Y, X, b, B){
               xhistory = xhistory, whistory = whistory))
 }
 
-
-
+## tuning parameters
 smctuning <- list(nparticles = 2^10, ess_criterion = 0.5, nmoves = 2)
 smctuning$stepsize <- 0.3 * p^{-1/4}
 smctuning$nleapfrog <- ceiling(1/smctuning$stepsize)
 delta <- 10
 ndataseq <- seq(from = 0, to = length(Y), by = delta)
+nrep <- 5
 
-## Prior
+## Prior 1
 b <- matrix(2, nrow = p, ncol = 1)
 B <- diag(3, p, p)
-
-nrep <- 5
 smc_partial_results <- foreach(irep = 1:nrep) %dorng% {
   asmc_hmc_partial(smctuning, delta, Y, X, b, B)
 }
 
+## Prior 2
 b2 <- matrix(-2, nrow = p, ncol = 1)
 B2 <- diag(3, p, p)
-# priordist2 <- get_mvnormal_diag(b2[,1], diag(B2))
-
 smc_partial_results2 <- foreach(irep = 1:nrep) %dorng% {
   asmc_hmc_partial(smctuning, delta, Y, X, b2, B2)
 }
-
-
-# save(n, delta, Y, X, b, B, smctuning, smc_partial_results,
-#      file = paste0("experiments/logistic/covtype.partial.long.n", n, ".RData"))
 
 path.partial.df <- data.frame()
 for (rep in 1:length(smc_partial_results)){
@@ -261,14 +241,6 @@ for (rep in 1:length(smc_partial_results)){
                time = time)
   }) %>% bind_rows())
 }
-# ggplot(path.partial.df, aes(x = mean, y = var, group = interaction(component, rep))) + geom_path() + scale_y_log10()
-
-# save(smctuning, delta, ndataseq, nrep, smc_partial_results, file = "experiments/logistic/covtype.priormerging.RData")
-
-
-# save(n, delta, Y, X, b2, B2, smctuning, smc_partial_results2,
-#      file = paste0("experiments/logistic/covtype.partial.long2.n", n, ".RData"))
-
 
 path.partial.df2 <- data.frame()
 for (rep in 1:length(smc_partial_results2)){
@@ -281,15 +253,8 @@ for (rep in 1:length(smc_partial_results2)){
                time = time)
   }) %>% bind_rows())
 }
-ggplot(path.partial.df2, aes(x = mean, y = var, group = interaction(component, rep))) + geom_path(alpha = 0.2)  +
-  geom_path(data = path.partial.df, colour = 'red',alpha = 0.2) + scale_y_log10()
 
 
-## ridge plot of some components
-
-## ridge plot for the evolution of the marginal
-## distributions of a component (e.g. the first one)
-library(ggridges)
 results <- smc_partial_results[[1]]
 results2 <- smc_partial_results2[[1]]
 df_hist  <- data.frame()
@@ -311,14 +276,4 @@ tail(df_hist)
 save(df_hist, df_hist2, b, b2, B, B2, smctuning, delta, ndataseq, nrep, path.partial.df, path.partial.df2,
     file = "experiments/logistic/covtype.merging.RData")
 
-gridges <- ggplot()
-gridges <- gridges + xlab(expression(x)) + ylab("# observations") + geom_vline(xintercept = 0, linetype = 2)
-ridgescale <- 20
-gridges <- gridges + geom_ridgeline(data=df_hist %>% filter(component == 1),
-                                    aes(x = x, y = ndata, height = y, group = ndata),
-                                    col = 'red', fill = 'red', scale = ridgescale, alpha  = 0.1, size  = 0.2)
-gridges <- gridges + geom_ridgeline(data=df_hist2 %>% filter(component == 1), aes(x = x, y = ndata, height = y, group = ndata),
-                                    col = 'blue', fill = 'blue', scale = ridgescale, alpha  = 0.1, size  = 0.2)
-gridges <- gridges + coord_flip()
-print(gridges)
 

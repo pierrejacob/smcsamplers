@@ -12,6 +12,6 @@ Sequential Monte Carlo samplers
 Reproduces the figures in \url{https://arxiv.org/abs/2007.11936}
 }
 \author{
-Pierre E. Jacob <pierre.jacob.work@gmail.com>
+Chenguang Dai, Jeremy Heng, Pierre E. Jacob <pierre.jacob.work@gmail.com>, Nick Whiteley
 }
 \keyword{package}

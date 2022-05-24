@@ -1,20 +1,6 @@
 rm(list = ls())
 library(smcsamplers)
 set.seed(1)
-library(tidyverse)
-library(ggplot2)
-library(ggridges)
-library(ggthemes)
-theme_set(theme_tufte(ticks = TRUE))
-theme_update(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),
-             axis.title.x = element_text(size = 25, margin = margin(20, 0, 0, 0), hjust = 1),
-             axis.title.y = element_text(size = 25, angle = 90, margin = margin(0, 20, 0, 0), vjust = 1),
-             legend.text = element_text(size = 20),
-             legend.title = element_text(size = 20), title = element_text(size = 30),
-             strip.text = element_text(size = 25), strip.background = element_rect(fill = "white"),
-             legend.position = "bottom")
-library(doParallel)
-library(doRNG)
 registerDoParallel(cores = 6)
 load("experiments/logistic/covtype.processed.RData")
 #
@@ -113,13 +99,6 @@ asmc_hmc_chunk <- function(smctuning, particles, logweights, roots, nstart, delt
       particles$target$logpdf <- particles$target$logpdf[ancestors]
       particles$target$gradlogpdf <- particles$target$gradlogpdf[,ancestors,drop=F]
       logweights <- rep(0, particles$n)
-      ## MCMC move at current lambda
-      # accept_rate_ <- 0
-      # for (imove in 1:smctuning$nmoves){
-      # hmc_res <- hmc_kernel_chunk(particles, smctuning, Y[1:n_next], X[1:n_next,], delta, lambda_current)
-      # particles <- hmc_res$particles
-      # accept_rate_ <- accept_rate_ + hmc_res$accept_rate
-      # }
       ## HMC move targeting distribution corresponding to next lambda
       info <- list()
       for (imove in 1:smctuning$nmoves){
@@ -161,8 +140,6 @@ asmc_hmc_chunk <- function(smctuning, particles, logweights, roots, nstart, delt
         info[[imove]] <- list(ar = mean(accepts), sqjd = sqjd)
       }
       infos_mcmc[[length(infos_mcmc)+1]] <- info
-      # cat("assimilating data from", nstart, "to", nstart+delta, "; current lambda =", lambda_current, "\n")
-      # cat("HMC mean acceptance", accept_rate_ / smctuning$nmoves, "\n")
     }
   }
   return(list(particles = particles, logweights = logweights, lambdas = lambdas,
@@ -183,8 +160,6 @@ asmc_hmc_partial <- function(smctuning, delta, Y, X, b, B){
   particles$n <- smctuning$nparticles
   particles$x <- initparticles
   particles$d <- dim(particles$x)[1]
-  # particles$init <- initdist(particles$x)
-  # particles$target <- targetdist(particles$x)
   logweights <- rep(0, particles$n)
   ##
   istep <- 1
@@ -252,9 +227,6 @@ smc_partial_results <- foreach(irep = 1:nrep) %dorng% {
   asmc_hmc_partial(smctuning, delta, Y, X, b, B)
 }
 
-# save(n, delta, Y, X, b, B, smctuning, smc_partial_results,
-#      file = paste0("experiments/logistic/covtype.partial.long.n", n, ".RData"))
-
 ## predictive performance
 nrep <- length(smc_partial_results)
 perf.df <- foreach (rep = 1:nrep, .combine = rbind) %dopar% {
@@ -270,7 +242,6 @@ perf.df <- foreach (rep = 1:nrep, .combine = rbind) %dopar% {
     ## log (sum_{n=1}^N W_n p(ytest | beta_n))
     ## log {C * sum_{n=1}^N W_n exp(log p(ytest | beta_n) - log(C))}
     ## log C + log { sum_{n=1}^N W_n exp(log p(ytest | beta_n) - log(C)) }
-    # mean(logliketest)
     max_ll_test <- max(logliketest)
     perf <- max_ll_test + log(sum(ws_ * exp(logliketest - max_ll_test)))
     performances_ <- c(performances_, perf)
@@ -280,14 +251,3 @@ perf.df <- foreach (rep = 1:nrep, .combine = rbind) %dopar% {
 }
 head(perf.df)
 save(smctuning, perf.df, ntest, n, file = "experiments/logistic/covtype.predperf.RData")
-
-gperf1 <- ggplot(perf.df %>% filter(nassimilated >= 100, nassimilated <= 5000),
-                 aes(x = nassimilated, y = performances_, group = rep))
-gperf1 <- gperf1 + geom_line(size = 0.1)
-gperf1 <- gperf1 + xlab("# observations") + ylab("log score on test")
-gperf1
-
-gperf2 <- ggplot(perf.df %>% filter(nassimilated >= 5000), aes(x = nassimilated, y = performances_, group = rep))
-gperf2 <- gperf2 + geom_line(size = 0.1)
-gperf2 <- gperf2 + xlab("# observations") + ylab("log score on test")
-gperf2

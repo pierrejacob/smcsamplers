@@ -1,9 +1,7 @@
 rm(list = ls())
 library(smcsamplers)
+require(cobs)
 set.seed(1)
-library(tidyverse)
-library(doParallel)
-library(doRNG)
 registerDoParallel(cores = detectCores()-2)
 load("experiments/logistic/covtype.processed.RData")
 #
@@ -46,15 +44,11 @@ targetdist <- function(xs,...){
 }
 ##
 
-# targetdist(initparticles)
-
 smctuning$stepsize <- 0.3 * p^{-1/4}
 smctuning$nleapfrog <- ceiling(1/smctuning$stepsize)
 
 adaptiveresults <- asmc_hmc(smctuning, targetdist, initdist, initparticles)
 nsteps <- length(adaptiveresults$xhistory)
-
-# qplot(x = 1:nsteps, y = adaptiveresults$lambdas, geom = "line") + ylab(expression(lambda)) + xlab("time")
 
 ## get information about how the MCMC steps performed
 info_mcmc_df <- lapply(2:length(adaptiveresults$lambdas), function(ilambda) {
@@ -68,12 +62,12 @@ gar <- ggplot(info_mcmc_df, aes(x = ilambda, y = ar)) + geom_point()
 gar <- gar + xlab("step") + ylab("acceptance rate") + geom_rangeframe()
 gsqjd <- ggplot(info_mcmc_df, aes(x = ilambda, y = sqjd)) + geom_point()
 gsqjd <- gsqjd + xlab("step") + ylab("relative jumping distance") + geom_rangeframe()
-# gridExtra::grid.arrange(gar, gsqjd, nrow = 2)
+gridExtra::grid.arrange(gar, gsqjd, nrow = 2)
 ##
 
 ## finer grid of lambdas
 nlambdas <- 50
-require(cobs)
+
 xgrid <- (0:(nsteps-1))/(nsteps-1)
 fit = cobs(x = xgrid, y = adaptiveresults$lambdas, constraint= "increase",
            lambda=0, degree=1, # for L1 roughness
@@ -83,18 +77,11 @@ xfinergrid <- seq(from = 0, to = 1, length.out = nlambdas)
 yrange <- predict(fit,interval="none",z=c(0,1))[,2]
 yfinergrid <- (predict(fit,interval="none",z=xfinergrid)[,2] - yrange[1])/(yrange[2]-yrange[1])
 
-# plot(xgrid, adaptiveresults$lambdas, xlim = c(0,1), ylim = c(0,1))
-# points(xfinergrid, yfinergrid, col = 'red', lty = 2)
 ##
 smctuning$lambdas <- yfinergrid
 smctuning$lambdas[1] <- 0
 smctuning$lambdas <- pmax(pmin(smctuning$lambdas, 1), 0)
 ##
-# initparticles <- b[,1] + sqrt(diag(B)) * matrix(rnorm(p*smctuning$nparticles), nrow = p)
-# results <- smc_hmc(smctuning, targetdist, initdist, initparticles)
-# print(tail(results$nroots))
-# qplot(x = 1:length(results$lambdas), results$nroots, geom = 'line') + xlab("time") + geom_rangeframe()
-
 
 nrep <- 10
 smc_hmc_results <- foreach(irep = 1:nrep) %dorng% {

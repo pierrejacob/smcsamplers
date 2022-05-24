@@ -1,4 +1,6 @@
-###
+### script that defines some target distributions: 'banana' and multivariate Normals
+
+## banana distribution
 #'@export
 get_banana <- function(){
   # target log-density evaluation
@@ -13,7 +15,7 @@ get_banana <- function(){
   return(list(eval = bananaeval))
 }
 
-
+## multivariate Normal distribution
 #'@export
 get_mvnormal <- function(mean, variance){
   dimension <- length(mean)
@@ -29,6 +31,7 @@ get_mvnormal <- function(mean, variance){
               generate = function(n) t(smcsamplers:::rmvnorm_cholesky_(n, mean, cholvariance))))
 }
 
+## multivariate Normal with diagonal covariance matrix (faster than 'get_mvnormal')
 #'@export
 get_mvnormal_diag <- function(mean, variance){
   sd_ <- sqrt(variance)

@@ -1,3 +1,4 @@
+# binary search to find lambda in [current_lambda, 1] such that f(lambda) = objective
 # f has to be a decreasing continuous function of lambda, and current_lambda between 0 and 1
 #'@export
 search_lambda <- function(current_lambda, f, objective, maxsteps = 1000, tolerance = 1e-2){

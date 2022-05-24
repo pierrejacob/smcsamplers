@@ -3,5 +3,3 @@
 # Except this file
 !.gitignore
 !logistic/
-!sirmodel/
-!mvnorm/

@@ -1,12 +1,12 @@
-## the goal of this function is to run a non-adaptive SMC sampler
-## for which the normalizing constant estimator is unbiased
+## adaptive SMCS using MALA moves
 ## resampling is done according to ESS criterion
-## but sequence of lambdas is fixed,
+## sequence of lambdas is fixed,
 ## and MCMC moves are fixed too
-## smctuning list containing lambdas
-## targetdist
-## initdist
-## initparticles
+## smctuning list containing
+## - lambdas, nparticles, ess_criterion, nmoves, sqrth, h
+## targetdist: describes the target distribution
+## initdist: describes the initial distribution
+## initparticles:
 #'@export
 smc_mala <- function(smctuning, targetdist, initdist, initparticles){
   starttime <- Sys.time()
@@ -90,12 +90,12 @@ smc_mala <- function(smctuning, targetdist, initdist, initparticles){
                                                    mean = zerod, cholesky_inverse = 1/smctuning$sqrth * smctuning$cholinvcov)
       ## accept-reject step
       us <- runif(particles$n)
-      MHratios <- (1-lambda) * next_particles$init$logpdf + lambda * next_particles$target$logpdf
-      MHratios <- MHratios - ((1-lambda) * particles$init$logpdf + lambda * particles$target$logpdf)
-      MHratios <- MHratios + bw - fw
-      MHratios[is.na(MHratios)] <- -Inf
+      MRTHratios <- (1-lambda) * next_particles$init$logpdf + lambda * next_particles$target$logpdf
+      MRTHratios <- MRTHratios - ((1-lambda) * particles$init$logpdf + lambda * particles$target$logpdf)
+      MRTHratios <- MRTHratios + bw - fw
+      MRTHratios[is.na(MRTHratios)] <- -Inf
       for (iparticle in 1:particles$n){
-        if (log(us[iparticle]) < MHratios[iparticle]){
+        if (log(us[iparticle]) < MRTHratios[iparticle]){
           particles$x[,iparticle] <- next_particles$x[,iparticle]
           particles$init$logpdf[iparticle] <- next_particles$init$logpdf[iparticle]
           particles$init$gradlogpdf[,iparticle] <- next_particles$init$gradlogpdf[,iparticle]

@@ -1,3 +1,6 @@
+## from a list of ancestor variables,
+## reconstruct the lineages
+## (for plotting purposes)
 #'@export
 ahistory2genealogy <- function(ahistory){
   nsteps <- length(ahistory)

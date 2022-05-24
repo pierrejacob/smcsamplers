@@ -1,3 +1,12 @@
+## adaptive SMCS using MALA moves on geometric path
+## resampling is done according to ESS criterion
+## sequence of lambdas is fixed
+## and MCMC moves are fixed too
+## smctuning list containing
+## - lambdas, nparticles, ess_criterion, nmoves, nleapfrog, stepsize
+## targetdist: describes the target distribution
+## initdist: describes the initial distribution
+## initparticles:
 #'@export
 smc_hmc <- function(smctuning, targetdist, initdist, initparticles){
   starttime <- Sys.time()

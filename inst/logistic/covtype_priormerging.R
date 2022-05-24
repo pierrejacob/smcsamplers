@@ -1,20 +1,6 @@
 rm(list = ls())
 library(smcsamplers)
 set.seed(1)
-library(tidyverse)
-library(ggplot2)
-library(ggridges)
-library(ggthemes)
-theme_set(theme_tufte(ticks = TRUE))
-theme_update(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),
-             axis.title.x = element_text(size = 25, margin = margin(20, 0, 0, 0), hjust = 1),
-             axis.title.y = element_text(size = 25, angle = 90, margin = margin(0, 20, 0, 0), vjust = 1),
-             legend.text = element_text(size = 20),
-             legend.title = element_text(size = 20), title = element_text(size = 30),
-             strip.text = element_text(size = 25), strip.background = element_rect(fill = "white"),
-             legend.position = "bottom")
-library(doParallel)
-library(doRNG)
 registerDoParallel(cores = 6)
 load("experiments/logistic/covtype.processed.RData")
 #

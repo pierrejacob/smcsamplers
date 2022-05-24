@@ -1,3 +1,5 @@
+## From the output of SMCS, compute asymptotic variance estimator for the normalizing constant,
+## as in Lee & Whiteley 2018 and as described in Section 4.1 of the article.
 #'@export
 variance_estimator <- function(results){
   nparticles <- results$particles$n

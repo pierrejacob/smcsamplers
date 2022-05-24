@@ -175,7 +175,7 @@ unbiased_moments <- function(initdist, targetdist, smctuning){
     unbiased_moment1 <- unbiased_moment1 + (moment11 - moment12)
     unbiased_moment2 <- unbiased_moment2 + (moment21 - moment22)
   }
-  while(!meeting && (iteration < 1e2)){
+  while (!meeting){
     iteration <- iteration + 1
     ## advance two chains with same proposal
     initparticlesprop <- initdist$generate(smctuning$nparticles)

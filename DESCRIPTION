@@ -7,9 +7,8 @@ Maintainer: Anonymous <anonymous@mail>
 Description: Sequential Monte Carlo samplers
 License: GPL (>= 2)
 Depends:
-    Rcpp (>= 0.11.6), RcppEigen
+    Rcpp (>= 0.11.6), RcppEigen, tidyverse, doParallel, doRNG, ggplot2, ggridges, ggthemes
 Imports:
-    Rcpp (>= 0.11.6),RcppEigen
 LinkingTo: Rcpp, RcppEigen
 RoxygenNote: 7.1.0
 LazyData: true

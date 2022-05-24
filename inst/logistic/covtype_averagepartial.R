@@ -244,8 +244,6 @@ load("experiments/logistic/covtype.smcpartial.RData")
 ndataseq <- c(0, 25, 50, 100, 250, 500)
 ndata_ <- ndataseq[2]
 
-# summary_ <- path.partial.df %>% filter(ndata == ndata_) %>% group_by(component) %>%
-#   summarise(medmean = median(mean), medvar = median(var)) %>% select(medmean, medvar) %>% as.matrix
 initmean <- b[,1]
 initvar <- B
 

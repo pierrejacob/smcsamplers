@@ -6,6 +6,11 @@
 
 using namespace Rcpp;
 
+#ifdef RCPP_USE_GLOBAL_ROSTREAM
+Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
+Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
+#endif
+
 // coxprocess_loglikelihood
 NumericVector coxprocess_loglikelihood(const NumericMatrix& x, const IntegerVector& counts, double area);
 RcppExport SEXP _smcsamplers_coxprocess_loglikelihood(SEXP xSEXP, SEXP countsSEXP, SEXP areaSEXP) {

@@ -67,6 +67,8 @@ pgg_kernel <- function(beta, precomputed){
   beta <- smcsamplers:::rmvnorm_cholesky_(1, res$m, res$Cholesky)
   return(t(beta))
 }
+
+
 ##
 # pandl <- get_prior_and_ll(Y, X, B[1,1])
 # logprior <- pandl$logprior
@@ -108,7 +110,8 @@ asmc_pgg <- function(smctuning){
     Yxbeta_sums <- colSums(Y * xbeta)
     ess_deltalambda <- function(lambda){
       logw <- (lambda - lambda_current) * Yxbeta_sums - colSums(log(1 + exp(lambda * xbeta)) - log(1 + exp(lambda_current * xbeta)))
-      return(1/sum(PET::normalize_weight(logw)$nw^2))
+      # return(1/sum(PET::normalize_weight(logw)$nw^2))
+      return(1/sum(smcsamplers::normalize_weight(logw)$nw^2))
     }
     if (ess_deltalambda(1) > smctuning$ess_criterion * smctuning$nparticles){
       lambda_next <- 1

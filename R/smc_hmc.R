@@ -37,7 +37,7 @@ smc_hmc <- function(smctuning, targetdist, initdist, initparticles){
     mlw <- max(incrweight)
     log_ratio_normconst <- c(log_ratio_normconst, mlw + log(sum(nweights * exp(incrweight - mlw))))
     logweights <- logweights + incrweight
-    nweights <- PET::normalize_weight(logweights)$nw
+    nweights <- smcsamplers::normalize_weight(logweights)$nw
     ess_realized <- c(ess_realized, 1/sum(nweights^2))
     ## compute empirical variance of each component of the target
     estimated_means <- sapply(1:particles$d, function(component)

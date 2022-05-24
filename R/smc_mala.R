@@ -51,7 +51,7 @@ smc_mala <- function(smctuning, targetdist, initdist, initparticles){
     mlw <- max(incrweight)
     log_ratio_normconst <- c(log_ratio_normconst, mlw + log(sum(nweights * exp(incrweight - mlw))))
     logweights <- logweights + incrweight
-    nweights <- PET::normalize_weight(logweights)$nw
+    nweights <- smcsamplers::normalize_weight(logweights)$nw
     ess_realized <- c(ess_realized, 1/sum(nweights^2))
     ## compute covariance of target
     smctuning$cov <- cov.wt(x = t(particles$x), wt = nweights)$cov

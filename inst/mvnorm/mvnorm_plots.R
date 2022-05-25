@@ -1,12 +1,7 @@
 
 rm(list = ls())
 library(smcsamplers)
-library(ggplot2)
-library(ggthemes)
 graphsettings <- set_custom_theme()
-library(doParallel)
-library(doRNG)
-library(tidyverse)
 registerDoParallel(cores = 6)
 set.seed(3)
 theme_set(theme_tufte(ticks = TRUE))
@@ -24,8 +19,8 @@ head(fixedndf)
 load(file = "experiments/mvnorm/scalinglinearn.RData")
 head(linearndf)
 
-load(file = "experiments/mvnorm/scalingintermediate.RData")
-head(intermedf)
+load(file = "experiments/mvnorm/scalingintermediate.unbiased.RData")
+head(intermedf.unbiased)
 
 colours <- c("black", "cornflowerblue", "antiquewhite3")
 
@@ -46,18 +41,18 @@ colours <- c("black", "cornflowerblue", "antiquewhite3")
 # gnroots <- ggplot(linearndf, aes(x = dimension, y = nroots, group = rep)) + geom_point()
 # gridExtra::grid.arrange(gnsteps, gnroots, gsqerror, gzhat)
 #
-# gnsteps <- ggplot(intermedf, aes(x = dimension, y = nsteps, group = rep)) + geom_point()
-# gsqerror <- ggplot(intermedf  %>% group_by(dimension) %>% summarize(meansqerror = mean(sqerror)),
+# gnsteps <- ggplot(intermedf.unbiased, aes(x = dimension, y = nsteps, group = rep)) + geom_point()
+# gsqerror <- ggplot(intermedf.unbiased  %>% group_by(dimension) %>% summarize(meansqerror = mean(sqerror)),
 #                    aes(x = dimension, y = meansqerror)) + geom_point()
-# gzhat <- ggplot(intermedf %>% group_by(dimension) %>% summarise(varzhat = var(zhat)),
+# gzhat <- ggplot(intermedf.unbiased %>% group_by(dimension) %>% summarise(varzhat = var(zhat)),
 #                 aes(x = dimension, y = varzhat)) + geom_point()
-# gnroots <- ggplot(intermedf, aes(x = dimension, y = nroots, group = rep)) + geom_point()
+# gnroots <- ggplot(intermedf.unbiased, aes(x = dimension, y = nroots, group = rep)) + geom_point()
 # gridExtra::grid.arrange(gnsteps, gnroots, gsqerror, gzhat)
 
 
 df_ <- rbind(fixedndf %>% mutate(case = "fixed N"),
   linearndf %>% mutate(case = "linear N"),
-  intermedf %>% mutate(case = "fixed N & d steps"))
+  intermedf.unbiased %>% mutate(case = "fixed N & d steps"))
 head(df_)
 
 plotwidth <- 7
@@ -93,4 +88,67 @@ gzhat <- gzhat + scale_color_manual(name = '', values = colours[c(1,3,2)]) + yla
 gzhat <- gzhat + geom_rangeframe() + scale_x_continuous(breaks = dimensions)
 gzhat
 ggsave(filename = "experiments/mvnorm/varzhat.pdf", plot = gzhat, width = plotwidth, height = plotheight)
+
+gbiaszhat <- ggplot(df_ %>% group_by(dimension, case) %>% summarise(bias_logzhat = mean(zhat)-1),
+                   aes(x = dimension, y = bias_logzhat, colour = case, linetype = case)) + geom_line(size = linesize)
+gbiaszhat <- gbiaszhat + scale_color_manual(name = '', values = colours[c(1,3,2)]) + ylab("bias log constant")  + scale_linetype(name = "")
+gbiaszhat <- gbiaszhat + geom_rangeframe() + scale_x_continuous(breaks = dimensions)
+gbiaszhat # + scale_y_log10()
+
+
+gmsezhat <- ggplot(df_ %>% group_by(dimension, case) %>% summarise(mse_logzhat = mean((exp(zhat)-1)^2)),
+                aes(x = dimension, y = mse_logzhat, colour = case, linetype = case)) + geom_line(size = linesize)
+gmsezhat <- gmsezhat + scale_color_manual(name = '', values = colours[c(1,3,2)]) + ylab("MSE constant")  + scale_linetype(name = "")
+gmsezhat <- gmsezhat + geom_rangeframe() + scale_x_continuous(breaks = dimensions)
+gmsezhat # + scale_y_log10()
+
+
+# load("experiments/mvnorm/scalingintermediate.RData")
+# tail(intermedf)
+# load("experiments/mvnorm/scalingintermediate.unbiased.RData")
+# tail(intermedf.unbiased)
+#
+# df_ <- rbind(intermedf %>% mutate(case = "fixed N & d steps"),
+#              intermedf.unbiased %>% mutate(case = "fixed N & d steps - unbiased"))
+# head(df_)
+#
+# plotwidth <- 7
+# plotheight <- 5
+# linesize <- 1
+#
+# colours <- c("antiquewhite3", "orange")
+#
+# gnroots <- ggplot(df_ %>% group_by(dimension, case) %>% summarise(meannroots = mean(nroots)),
+#                   aes(x = dimension, y = meannroots, colour = case, linetype = case)) + geom_line(size = linesize)
+# gnroots <- gnroots + scale_color_manual(name = '', values = colours[c(1,2)]) + ylab("mean # roots")
+# gnroots <- gnroots + scale_linetype(name = "")
+# gnroots <- gnroots + geom_rangeframe() + scale_x_continuous(breaks = dimensions)
+# gnroots
+#
+#
+# gsqerror <- ggplot(df_  %>% group_by(dimension, case) %>% summarize(meansqerror = mean(sqerror)),
+#                    aes(x = dimension, y = meansqerror, colour = case, linetype = case)) + geom_line(size = linesize)
+# gsqerror <- gsqerror + scale_color_manual(name = '', values = colours[c(1,2)]) + ylab("MSE E[X]") + scale_linetype(name = "")
+# gsqerror <- gsqerror + geom_rangeframe()  + scale_x_continuous(breaks = dimensions)
+# gsqerror
+#
+# gzhat <- ggplot(df_ %>% group_by(dimension, case) %>% summarise(varzhat = var(zhat)),
+#                 aes(x = dimension, y = varzhat, colour = case, linetype = case)) + geom_line(size = linesize)
+# gzhat <- gzhat + scale_color_manual(name = '', values = colours[c(1,2)]) + ylab("variance log constant")  + scale_linetype(name = "")
+# gzhat <- gzhat + geom_rangeframe() + scale_x_continuous(breaks = dimensions)
+# gzhat
+#
+#
+# gmsezhat <- ggplot(df_ %>% group_by(dimension, case) %>% summarise(mse_logzhat = mean((exp(zhat)-1)^2)),
+#                    aes(x = dimension, y = mse_logzhat, colour = case, linetype = case)) + geom_line(size = linesize)
+# gmsezhat <- gmsezhat + scale_color_manual(name = '', values = colours[c(1,2)]) + ylab("MSE constant")  + scale_linetype(name = "")
+# gmsezhat <- gmsezhat + geom_rangeframe() + scale_x_continuous(breaks = dimensions)
+# gmsezhat # + scale_y_log10()
+#
+#
+# gmsezhat <- ggplot(df_ %>% group_by(dimension, case) %>% summarise(mse_logzhat = mean((zhat-0)^2)),
+#                    aes(x = dimension, y = mse_logzhat, colour = case, linetype = case)) + geom_line(size = linesize)
+# gmsezhat <- gmsezhat + scale_color_manual(name = '', values = colours[c(1,2)]) + ylab("MSE log constant")  + scale_linetype(name = "")
+# gmsezhat <- gmsezhat + geom_rangeframe() + scale_x_continuous(breaks = dimensions)
+# gmsezhat # + scale_y_log10()
 

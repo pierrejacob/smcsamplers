@@ -7,10 +7,7 @@
 rm(list = ls())
 library(smcsamplers)
 graphsettings <- set_custom_theme()
-library(doParallel)
-library(doRNG)
-library(tidyverse)
-registerDoParallel(cores = 6)
+registerDoParallel(cores = 8)
 set.seed(3)
 
 smctuning <- list()
@@ -18,7 +15,7 @@ smctuning$ess_criterion <- 0.5
 smctuning$nmoves <- 1
 smctuning$nparticles <- 2^8
 
-nrep <- 50
+nrep <- 100
 dimensions <- c(32, 64, 128, 256, 512)
 fixedndf <- data.frame()
 for (idim in seq_along(dimensions)){

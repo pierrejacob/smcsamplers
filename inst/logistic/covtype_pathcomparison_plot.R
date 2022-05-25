@@ -41,7 +41,6 @@ gpathtempering <- gpathtempering + geom_path(size = linesize, colour = "antiquew
 gpathtempering <- gpathtempering + xlab("mean") + ylab("variance")
 gpathtempering <- gpathtempering + scale_x_continuous(breaks = c(-1,0,1))
 gpathtempering <- gpathtempering + geom_point(aes(colour = lambda))
-# gpathtempering <- gpathtempering + viridis::scale_color_viridis(name = expression(lambda), discrete=F, breaks = c(0,1)) #+ theme(legend.position = 'none')
 gpathtempering <- gpathtempering + scale_color_gradient2(name = expression(lambda), midpoint = 0.5,
                      mid = rgb(.2,0.05,0.2), low = colours[3], high = colours[2], breaks = c(0,1))
 gpathtempering <- gpathtempering +  theme(legend.key.width = unit(1.,"cm"))
@@ -66,7 +65,6 @@ for (rep in 1:length(asmc_pgg_results)){
   }) %>% bind_rows())
 }
 
-# ggplot(path.pgg.df, aes(x = mean, y = var, group = interaction(component, rep))) + geom_path() + scale_y_log10()
 path.pgg.df[path.pgg.df$time==1,2] <- 0
 path.pgg.df[path.pgg.df$time==1,3] <- 10
 
@@ -77,7 +75,6 @@ gpathpgg <- gpathpgg + scale_x_continuous(breaks = c(-1,0,1))
 gpathpgg <- gpathpgg + geom_point(aes(colour = lambda))
 gpathpgg <- gpathpgg + scale_color_gradient2(name = expression(lambda), midpoint = 0.5,
                            mid = rgb(.2,0.05,0.2), low = colours[3], high = colours[2], breaks = c(0,1))
-# +  viridis::scale_color_viridis(name = expression(lambda), discrete=F, breaks = c(0,1)) #+ theme(legend.position = 'none')
 gpathpgg <- gpathpgg +  theme(legend.key.width = unit(1.,"cm"))
 gpathpgg <- gpathpgg + guides(colour = guide_colorbar(title.vjust=1))
 gpathpgg

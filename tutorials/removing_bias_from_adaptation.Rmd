@@ -1,0 +1,356 @@
+---
+title: 'Removing the bias stemming from adaptation'
+output: html_document
+bibliography: references.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Question
+
+In this script, we consider the bias of the estimator ${Z}_T^N$ produced
+by adaptive sequential Monte Carlo samplers (SMCS). We address two questions:
+
+* Is this bias actually noticeable?
+
+* Can we remove it without too much hassle?
+
+## Setup
+
+We first load the `smcsamplers` package, some other packages and register some parallel cores.
+
+```{r loadpackage, message=F, warning=F}
+rm(list = ls())
+# install.packages("devtools")
+# devtools::install_github("pierrejacob/smcsamplers")
+library(smcsamplers)
+library(doParallel)
+library(doRNG)
+library(tidyverse)
+cores <- max(1, detectCores()-2)
+registerDoParallel(cores = cores)
+set.seed(3)
+## number of independent repetitions
+nrep <- 200
+```
+
+We consider the task of approximating the normalizing constant  of Normal$(0_d,I_d)$, starting from Normal$(1_d,0.5 I_d)$ in dimension $d$, where $0_d$ and $1_d$ are vectors of zeros and ones respectively, and $I_d$ is the $d$-dimensional identity matrix.
+
+
+```{r targetdef}
+## dimension of state space
+dimension <- 64
+## initial distribution "pi_0"
+initmean <- rep(1, dimension)
+initvar <- rep(0.5, dimension)
+initdist <- get_mvnormal_diag(initmean, initvar)
+## target distribution "pi"
+targetmean <- rep(0, dimension)
+targetvar <- rep(1, dimension)
+targetdist <- get_mvnormal_diag(targetmean, targetvar)
+```
+
+We tune an adaptive SMCS algorithm, using a geometric path between $\pi_0$ and $\pi$. That is,
+we define a path of distributions $(\pi_t)_{t=0}^T$ with 
+$$\pi_t(x)=\frac{\gamma_t(x)}{Z_t},\quad 
+\gamma_t(x)= \pi_0(x)^{1-\lambda_t} \pi(x)^{\lambda_t}, \quad
+Z_t=\int_{\mathbb{R}^d}\gamma_t(x)dx,
+$$ 
+defined for a sequence $0=\lambda_0<\lambda_1<\cdots<\lambda_T=1$. 
+The algorithm determines a sequence of intermediate distributions based on the Effective Sample Size (ESS) criterion. For the move steps we will use Hamiltonian Monte Carlo, which is known to perform well for
+Normal distributions and other similar ones.
+
+```{r first_tuning}
+## set tuning parameters for adaptive SMC sampler with HMC moves
+smctuning <- list()
+## number of particles
+smctuning$nparticles <- 2^9
+## ESS criterion threshold; number in (0,1)
+smctuning$ess_criterion <- 0.5
+## stepsize for the HMC moves
+smctuning$stepsize <- 1 * dimension^{-1/4}
+## number of leapfrog steps
+smctuning$nleapfrog <- ceiling(1/smctuning$stepsize)
+## number of HMC moves to perform at each move step
+smctuning$nmoves <- 1
+```
+
+We run the adaptive SMCS algorithm and extract a schedule of $(\lambda_t)$.
+
+```{r first_run}
+## 
+initparticles <- initmean + sqrt(initvar) * matrix(rnorm(dimension*smctuning$nparticles), nrow = dimension)
+results <- asmc_hmc(smctuning, targetdist, initdist, initparticles)
+nsteps <- length(results$xhistory)
+plot(1:nsteps, results$lambdas, ylim = c(0,1), xlab = 'step', ylab = 'lambda', main = 'lambda along the steps')
+smctuning$lambdas <- results$lambdas
+```
+
+We fix the number of steps $T$ and the sequence $(\lambda_t)_{t=1}^T$,
+and consider running SMCS `r nrep` times independently, 
+and looking at the generated ${Z}_T^N$. Note that here
+$Z_0=Z=1$ so that ${Z}_T^N$ is an estimator of one.
+
+```{r originalruns}
+zhat_original_df <- foreach(irep = 1:nrep, .combine = rbind) %dorng% {
+  initparticles <- initmean + sqrt(initvar) * matrix(rnorm(dimension*smctuning$nparticles), nrow = dimension)
+  results <- smc_hmc(smctuning, targetdist, initdist, initparticles)
+  nsteps <- length(results$lambdas)
+  zhat <- sum(results$log_ratio_normconst)
+  data.frame(nsteps = nsteps, zhat = zhat, rep = irep, nparticles = smctuning$nparticles)
+}
+hist(exp(zhat_original_df$zhat), nclass = 40, xlab = 'Z hat', main = "")
+abline(v = mean(exp(zhat_original_df$zhat)))
+abline(v = 1, col = 'blue')
+```
+
+The above histogram shows the distribution of ${Z}_T^N$, generated `r nrep` times independently.
+The vertical black line indicates the empirical mean of  ${Z}_T^N$,
+clearly lower than the target value $Z = 1$ shown by a vertical blue line.
+
+## Reducing the variance and the bias
+
+To obtain more precise results
+we can increase the number of intermediate steps.
+For example we can double that number, which results in an approximate doubling
+of the computing cost.
+To add intermediate values of $\lambda$
+we can perform a parametric approximation of $\lambda_t$ against $t$,
+and add more $t$'s. Here we use the `cobs` package to 
+fit splines constrained to be increasing.
+
+```{r gridrefinement, message=F, warning=F, echo=F}
+## finer grid of lambdas
+nintermediate <- nsteps*2
+nlambdas <- nintermediate
+require(cobs)
+xgrid <- (0:(nsteps-1))/(nsteps-1)
+fit = cobs(x = xgrid, y = results$lambdas, constraint= "increase",
+           lambda=0, degree=1, # for L1 roughness
+           knots=seq(0, 1, length.out=floor(nsteps/2)), # desired nr of knots
+           tau=0.5, print.warn = F, print.mesg = F) # to predict median
+xfinergrid <- seq(from = 0, to = 1, length.out = nlambdas)
+yrange <- predict(fit,interval="none",z=c(0,1))[,2]
+yfinergrid <- (predict(fit,interval="none",z=xfinergrid)[,2] - yrange[1])/(yrange[2]-yrange[1])
+plot(xgrid, results$lambdas, ylim = c(0,1), xlab = 'step in (0,1)', ylab = 'lambda')
+points(xfinergrid, yfinergrid, col = 'red', lty = 2)
+legend(x = 0, y = 0.8, legend = c('original schedule', 'refined schedule'), col = c('black', 'red'), lty = c(1,1))
+```
+
+Next we run SMCS with the 'refined' schedule for $(\lambda_t)$.
+
+```{r runwithmorelambdas}
+## set up grid of lambdas
+smctuning_morelambdas <- smctuning
+smctuning_morelambdas$lambdas <- yfinergrid
+smctuning_morelambdas$lambdas <- pmax(pmin(smctuning_morelambdas$lambdas, 1), 0)
+zhat_morelambdas_df <- foreach(irep = 1:nrep, .combine = rbind) %dorng% {
+  initparticles <- initmean + sqrt(initvar) * matrix(rnorm(dimension*smctuning_morelambdas$nparticles), nrow = dimension)
+  results <- smc_hmc(smctuning_morelambdas, targetdist, initdist, initparticles)
+  nsteps <- length(results$lambdas)
+  zhat <- sum(results$log_ratio_normconst)
+  data.frame(nsteps = nsteps, zhat = zhat, rep = irep, nparticles = smctuning_morelambdas$nparticles)
+}
+```
+
+We can now observe a reduction in bias (and in variance).
+
+```{r histogram_betterestimates}
+hist(exp(zhat_morelambdas_df$zhat), nclass = 40, xlab = 'Z hat', main = "")
+abline(v = mean(exp(zhat_morelambdas_df$zhat)))
+abline(v = 1, col = 'blue')
+```
+
+
+Yet the bias is still visible. Is it significant? Using a Central Limit Theorem approximation
+we obtain a confidence interval for $\mathbb{E}[{Z}_T^N]$:
+```{r ci}
+cat(mean(exp(zhat_morelambdas_df$zhat)), '+/-', 1.96*sd(exp(zhat_morelambdas_df$zhat))/sqrt(nrep), '\n')
+```
+so yes, it is significantly away from the target value which is one.
+
+It comes from the SMCS being adaptive. In more details:
+
+* here the schedule $(\lambda_t)$ is fixed, so the bias cannot come from schedule adaptation.
+
+* resampling occurs only when the ESS goes below a threshold; however this does not
+lead to biases, as shown in [@whiteley2016role]; 
+
+* the tuning parameters of the MCMC steps are obtained from the available population of particles; this indeed
+creates some biases.
+
+## Stop adapting the MCMC steps
+
+A solution is thus to keep the MCMC algorithmic parameters fixed.
+In fact here the adaptation of HMC moves only involves 
+the variance of the current population of particles (to decide on the stepsize).
+Thus we can run SMCS to estimate these variances,
+and then run another SMCS with fixed variances.
+
+```{r}
+results <- smc_hmc(smctuning_morelambdas, targetdist, initdist, initparticles)
+smctuning_morelambdas$variances <- results$xvars_history
+
+### non-adaptive SMC with HMC moves using the pre-computed variances of the intermediate distributions
+smc_hmc_nonadaptive <- function(smctuning, targetdist, initdist, initparticles){
+  starttime <- Sys.time()
+  particles <- list()
+  particles$x <- initparticles
+  particles$init <- initdist(particles$x)
+  particles$target <- targetdist(particles$x)
+  particles$n <- smctuning$nparticles
+  particles$d <- dim(particles$x)[1]
+  ### initialize the inverse temperature
+  lambdas <- smctuning$lambdas
+  lambda_current <- lambdas[1]
+  ## lambda_current should be = 0
+  ## initialize the log normalizing constant estimator
+  log_ratio_normconst <- c()
+  ##
+  ess_realized <- c()
+  istep <- 1
+  roots <- 1:particles$n
+  logweights <- rep(0, particles$n)
+  nweights <- rep(1/particles$n, particles$n)
+  infos_mcmc <- list()
+  nroots <- c(particles$n)
+  moment1_history <- list()
+  moment2_history <- list()
+  moment1_history[[1]] <- rowMeans(particles$x)
+  moment2_history[[1]] <- (particles$x %*% t(particles$x)) / smctuning$nparticles
+  # while inv temperature is not one...
+  while(lambda_current < 1){
+    lambda_next <- lambdas[istep+1]
+    ## now weight / resample / MALA move
+    ## approximate variance of current target
+    incrweight <- (lambda_next - lambda_current) * (particles$target$logpdf - particles$init$logpdf)
+    incrweight[is.na(incrweight)] <- -Inf
+    mlw <- max(incrweight)
+    log_ratio_normconst <- c(log_ratio_normconst, mlw + log(sum(nweights * exp(incrweight - mlw))))
+    logweights <- logweights + incrweight
+    nweights <- smcsamplers::normalize_weight(logweights)$nw
+    ess_realized <- c(ess_realized, 1/sum(nweights^2))
+    ## retrieve pre-computed variances 
+    estimated_variances <- smctuning$variances[[istep+1]]
+    ## set mass "matrix" as inverse of variance (here only consider diagonal elements)
+    mass_matrix <- 1/estimated_variances
+    ## Cholesky decomposition
+    mass_chol <- sqrt(mass_matrix)
+    ## check ESS criterion
+    if (1/sum(nweights^2) < (smctuning$ess_criterion * smctuning$nparticles)){
+      ## resampling
+      ancestors <- sample(x = 1:smctuning$nparticles, size = smctuning$nparticles, prob = nweights, replace = TRUE)
+      logweights <- rep(0, particles$n)
+      nweights <- rep(1/particles$n, particles$n)
+      roots <- roots[ancestors]
+      particles$x <- particles$x[,ancestors,drop=F]
+      particles$init$logpdf <- particles$init$logpdf[ancestors]
+      particles$init$gradlogpdf <- particles$init$gradlogpdf[,ancestors,drop=F]
+      particles$target$logpdf <- particles$target$logpdf[ancestors]
+      particles$target$gradlogpdf <- particles$target$gradlogpdf[,ancestors,drop=F]
+    } else {
+      ancestors <- 1:smctuning$nparticles
+    }
+    info <- list()
+    for (imove in 1:smctuning$nmoves){
+      ## HMC move
+      lambda <- lambda_next
+      ## draw momenta variables
+      initial_momenta <- matrix(rnorm(particles$n * particles$d), nrow = particles$d) * mass_chol
+      ## compute gradients wrt target at current positions
+      grads_ <- (1-lambda) * particles$init$gradlogpdf + lambda * particles$target$gradlogpdf
+      positions <- particles$x
+      ## leap frog integrator
+      momenta <- initial_momenta + smctuning$stepsize * grads_ / 2
+      for (step in 1:smctuning$nleapfrog){
+        positions <- positions + smctuning$stepsize * momenta / mass_matrix
+        eval_init <- initdist(positions)
+        eval_target <- targetdist(positions)
+        if (step != smctuning$nleapfrog){
+          momenta <- momenta + smctuning$stepsize * ((1-lambda) * eval_init$gradlogpdf + lambda * eval_target$gradlogpdf)
+        }
+      }
+      momenta <- momenta + smctuning$stepsize * ((1-lambda) * eval_init$gradlogpdf + lambda * eval_target$gradlogpdf) / 2
+      ## compute MH acceptance ratios
+      proposed_pdfs <- (1-lambda) * eval_init$logpdf + lambda * eval_target$logpdf
+      current_pdfs  <- (1-lambda) * particles$init$logpdf + lambda * particles$target$logpdf
+      mhratios <- proposed_pdfs - current_pdfs
+      mhratios <- mhratios + (-0.5*colSums((momenta/mass_chol)^2)) - (-0.5*colSums((initial_momenta/mass_chol)^2))
+      if (any(is.na(mhratios))) mhratios[is.na(mhratios)] <- -Inf
+      ## compute expected squared jumping distance
+      ## normalized by estimated variance component-wise
+      sqjd <- mean(pmin(1, exp(mhratios)) * colSums((particles$x - positions)^2/estimated_variances)/particles$d)
+      ## accept - reject step
+      accepts <- log(runif(particles$n)) < mhratios
+      ## replace accepted particles
+      particles$x[,accepts] <- positions[,accepts,drop=F]
+      particles$init$logpdf[accepts] <- eval_init$logpdf[accepts]
+      particles$target$logpdf[accepts] <- eval_target$logpdf[accepts]
+      particles$target$gradlogpdf[,accepts] <- eval_target$gradlogpdf[,accepts,drop=F]
+      particles$init$gradlogpdf[,accepts] <- eval_init$gradlogpdf[,accepts,drop=F]
+      ## report performance of MCMC moves
+      info[[imove]] <- list(ar = mean(accepts), sqjd = sqjd)
+    }
+    infos_mcmc[[istep]] <- info
+    lambda_current <- lambda_next
+    istep <- istep + 1
+    ## store mean and variance
+    ## compute empirical variance of each component of the target
+    estimated_moment1 <- sapply(1:particles$d, function(component)
+      sum(particles$x[component,] * nweights))
+    # estimated_moment2 <- sapply(1:particles$d, function(component)
+    # sum(particles$x[component,]^2 * nweights))
+    estimated_moment2 <- (particles$x %*% (nweights * t(particles$x)))
+    moment1_history[[istep]] <- estimated_moment1
+    moment2_history[[istep]] <- estimated_moment2
+    nroots <- c(nroots, length(unique(roots)))
+  }
+  currenttime <- Sys.time()
+  elapsedtime <- as.numeric(lubridate::as.duration(lubridate::ymd_hms(currenttime) - lubridate::ymd_hms(starttime)), "seconds")
+  return(list(particles = particles, lambdas = lambdas,
+              log_ratio_normconst = log_ratio_normconst, ess_realized = ess_realized,
+              elapsedtime = elapsedtime, moment1_history = moment1_history, moment2_history = moment2_history,
+              nroots = nroots, infos_mcmc = infos_mcmc))
+}
+```
+
+```{r run_unbiased}
+zhat_unbiased_df <- foreach(irep = 1:nrep, .combine = rbind) %dorng% {
+  initparticles <- initmean + sqrt(initvar) * matrix(rnorm(dimension*smctuning_morelambdas$nparticles), nrow = dimension)
+  results <- smc_hmc_nonadaptive(smctuning_morelambdas, targetdist, initdist, initparticles)
+  nsteps <- length(results$lambdas)
+  zhat <- sum(results$log_ratio_normconst)
+  data.frame(nsteps = nsteps, zhat = zhat, rep = irep, nparticles = smctuning_morelambdas$nparticles)
+}
+```
+
+```{r histogram_unbiased}
+hist(exp(zhat_unbiased_df$zhat), nclass = 40, xlab = 'Z hat', main = "")
+abline(v = mean(exp(zhat_unbiased_df$zhat)))
+abline(v = 1, col = 'blue')
+cat(mean(exp(zhat_unbiased_df$zhat)), '+/-', 1.96*sd(exp(zhat_unbiased_df$zhat))/sqrt(nrep), '\n')
+```
+
+This time it appears that the bias is removed.
+
+## Conclusion
+
+The bias of adaptive SMCS can be noticeable; whether it matters or not is another story. 
+
+In cases where it matters, the bias can be removed by re-running SMCS with fixed MCMC algorithmic parameters.
+This requires an approximate two-fold increase in compute time; thus it is most likely feasible
+in any situation where SMCS is feasible.
+
+Note that the above implementation runs adaptive SMCS for $T$ steps, stores
+some information from the history of particles, and then runs a non-adaptive SMCS for $T$ steps.
+One could also run concurrently two sets of particles: one set following adaptive steps
+and the second set "non-adaptively" but informed by the first set of particles. 
+There the memory cost
+would be two-fold at each step, but there would be no need to store quantities corresponding to each
+intermediate distributions.
+
+## References
+
+

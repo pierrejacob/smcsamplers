@@ -1,0 +1,276 @@
+---
+title: 'Logistic regression: Path of partial posteriors'
+output: html_document
+bibliography: references.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data set and prior specification
+We begin by loading the forest cover type data set [@blackard2000comparison] which has been pre-processed. The data contain cartographic information (relating to altitude, slope, azimuth etc) for $30m$ by $30m$ cells in northern Colorado. The goal is to predict the type of cover (originally spruce/fir, lodgepole pine, Ponderosa pine, cottonwood/willow, spruce/fir and aspen or Douglas-fir, and in @collobert2002parallel this was simplified to lodgepole pine versus the other categories combined). We will fit a Bayesian logistic regression model to analyze this data set with $m=1000$ observations. For $1\leq p<q \leq m$, we will denote $x_{p:q}=(x_p,\ldots,x_q)\in\mathbb{R}^{(p-q+1)\times d}$ and $y_{p:q}=(y_p,\ldots,y_q)\in\{0,1\}^{(p-q+1)}$ as the design matrix and observations corresponding to the $p^{th}$ to $q^{th}$ data points.
+
+```{r dataset}
+load("covtype.processed.RData")
+m <- 1e3 # number of training datapoints
+d <- dim(trainingset)[2] - 1 # number of covariates
+Y <- trainingset[1:m,1] - 1
+X <- trainingset[1:m,2:(d+1)]
+```
+
+Next, we standardize the covariates and add a column of ones to the design matrix $x$ to account for the regression intercept.
+
+```{r standardize}
+X <- apply(X, 2, function(v) (v - mean(v))/(sd(v)))
+X <- cbind(1, X)
+d <- d + 1
+```
+
+Let $\beta\in\mathbb{R}^d$ denote the regression coefficients. We implement a function `loglikelihood` to evaluate the log-likelihood of the $p^{th}$ to $q^{th}$ data points under the logistic regression model
+$$
+\log p(y_{p:q}|x_{p:q},\beta)=\sum_{i=p}^qy_ix_i^\top\beta -\sum_{i=p}^q \log(1+\exp(\beta^\top x_i)),
+$$
+and a function `gradloglikelihood` to evaluate its gradient with respect to $\beta$ 
+$$
+\nabla \log p(y_{p:q}|x_{p:q},\beta)=\sum_{i=p}^qy_ix_i -\sum_{i=p}^q (1+\exp(-\beta^\top x_i))^{-1}x_i.
+$$
+These functions take as input a $d\times N$ matrix `beta` containing $N$ sets of regression coefficients. 
+
+```{r likelihood}
+loglikelihood <- function(beta, X, Y){
+  xbeta <- X %*% beta
+  return(colSums(Y * xbeta) - colSums(log(1 + exp(xbeta))))
+}
+
+gradloglikelihood <- function(beta, X, Y){
+  xbeta <- X %*% beta
+  Yx <- colSums(Y * X)
+  return(Yx - t(X) %*% (1 / (1 + exp(-xbeta))))
+}
+```
+
+We specify a prior distribution for $\beta\in\mathbb{R}^d$ using a Normal distribution with mean vector $b=0_d$ and covariance matrix $B=10 I_d$. We define a function `rprior` that returns $N\in\mathbb{N}$ random samples from the prior distribution, a function `logprior` that evaluates the log-prior density $\log p(\beta)=\log\mathcal{N}(\beta;b,B)$, and a function `gradlogprior` that evaluates the gradient of the log-prior density (with respect to $\beta$) $\nabla\log p(\beta)=B^{-1}(b-\beta)$. The last two functions take as input a $d\times N$ matrix `beta` containing $N$ sets of regression coefficients. 
+
+```{r prior}
+b <- matrix(0, nrow = d, ncol = 1)
+B <- diag(10, d, d)
+
+rprior <- function(N){
+  return(sqrt(10) * matrix(rnorm(d*N), nrow = d))
+}
+
+logprior <- function(beta){
+  return(colSums(dnorm(beta, mean = 0, sd = sqrt(10), log = TRUE)))
+}
+
+gradlogprior <- function(beta){
+  return(-beta / 10)
+}
+```
+
+# Components of sequential Monte Carlo sampler
+We now specify various algorithmic components that form a sequential Monte Carlo sampler (SMCS) [@del2006sequential]. 
+
+## Path of distributions
+We select a path of distributions $(\pi_t)_{t=0}^T$ with the prior distribution of $\beta$ as the first element and the posterior distribution based on $m$ observations as its last element. 
+We set $\pi_0(\beta)=p(\beta)$ and consider the path of partial posteriors $\pi_t(\beta)=p(\beta|x_{1:bt},y_{1:bt})$ for $t\in[T]$ [@chopin2002sequential], where $b\in\mathbb{N}$ is a batch size of observations at each step satisfying $bT=m$ to ensure that $\pi_T(\beta)=p(\beta|x_{1:m},y_{1:m})$. By assimilating data points in batches, we will be able to visualize how the posterior distribution and the marginal likelihood evolve as the number of observations increases. 
+
+Under this path, we have for $t\in[T]$  
+$$\pi_t(\beta)=\frac{\gamma_t(\beta)}{Z_t},\quad 
+\gamma_t(\beta)= p(\beta)p(y_{1:bt}|x_{1:bt},\beta), \quad
+Z_t=p(y_{1:bt}|x_{1:bt}),
+$$ 
+with $\gamma_0(\beta)=p(\beta)$ and $Z_0=1$. To initialize our SMCS with draws $\beta_0^n\sim\pi_0,n\in[N]$, we can use the `rprior` function defined earlier. To evaluate the unnormalized density $\gamma_t(\beta)$ and its gradient in the logarithmic scale, we will rely on the following identities
+$$ 
+\log \gamma_t(\beta) = \log p(\beta) + \log p(y_{1:bt}|x_{1:bt},\beta),\quad
+\nabla\log \gamma_t(\beta) = \nabla\log p(\beta) +  \nabla\log p(y_{1:bt}|x_{1:bt},\beta),
+$$ 
+and the functions defined above. 
+
+```{r path}
+loggamma <- function(beta, X, Y) logprior(beta) + loglikelihood(beta, X, Y)
+gradloggamma <- function(beta, X, Y) gradlogprior(beta) + gradloglikelihood(beta, X, Y)
+```
+
+## Forward Markov kernels
+For each $t\in[T]$, we shall select the forward Markov kernel $M_t$ using a Hamiltonian Monte Carlo (HMC) method targeting $\pi_t$. We will focus on its algorithmc implementation and refer readers to @neal2011mcmc for more details about HMC. We first define a function `leapfrog` which performs leapfrog numerical integration to simulate Hamiltonian dynamics. Briefly speaking, this function evolves a given `state` and `velocity` using a function `gradlogtarget` that evaluates $\nabla\log\pi_t(\beta)=\nabla\log\gamma_t(\beta)$. The algorithmic tuning parameters `stepsize` and `nleapfrog` control the size of the time-discretization and the number of integration steps. Although these are fixed for illustrative purposes, one should experiment with various choices and consider adaptive schemes to automated their selection for different target distributions [@buchholz2018adaptive].
+
+```{r leapfrog}
+stepsize <- 0.1 * d^{-1/4}
+nleapfrog <- ceiling(1 / stepsize)
+
+leapfrog <- function(state, velocity, gradlogtarget){
+  velocity <- velocity + stepsize * gradlogtarget(state) / 2
+  for (i in 1:nleapfrog){
+    state <- state + stepsize * velocity
+    if (i != nleapfrog){
+      velocity <- velocity + stepsize * gradlogtarget(state)
+    }
+  }
+  velocity <- velocity + stepsize * gradlogtarget(state) / 2
+  return(list(state = state, velocity = velocity))
+}
+```
+Next, we define a function `hmc_kernel` that samples from the HMC Markov kernel. 
+It proposes new parameters by calling `leapfrog`, and accepts them with a probability that depends on a function `logtarget` that evaluates $\log\gamma_t(\beta)$. 
+
+```{r hmc}
+hmc_kernel <- function(beta, logtarget, gradlogtarget){
+  N <- ncol(beta)
+  
+  # sample velocity
+  velocity <- matrix(rnorm(d*N), nrow = d, ncol = N) 
+  
+  # run leap-frog integrator
+  leapfrog_result <- leapfrog(beta, velocity, gradlogtarget)
+  proposed_beta <- leapfrog_result$state
+  proposed_velocity <- leapfrog_result$velocity
+  
+  # compute acceptance probability
+  logtarget_current <- logtarget(beta)
+  logtarget_proposal <- logtarget(proposed_beta)
+  accept_ratio <- logtarget_proposal - logtarget_current + colSums(velocity^2) / 2 - colSums(proposed_velocity^2) / 2
+  finite_logical <- is.finite(accept_ratio) # if there is stability issues
+  nfinite <- sum(finite_logical) 
+  
+  # accept or reject proposal
+  accept_logical <- rep(FALSE, N)
+  accept_logical[finite_logical] <- (log(runif(nfinite)) < accept_ratio[finite_logical])
+  beta[, accept_logical] <- proposed_beta[, accept_logical]
+  acceptrate <- sum(accept_logical) / N
+  
+  return(list(beta = beta, acceptrate = acceptrate))
+}
+```
+Running several iterations of the HMC kernel targeting $\pi_t$ to move samples $(\check{\beta}_{t-1}^n)_{n\in[N]}$ from step $t-1$ to a new set of samples $(\beta_{t}^n)_{n\in[N]}$ approximating $\pi_t$ implicitly defines a $\pi_t$-invariant forward Markov kernel $M_t$, i.e. $\beta_{t}^n\sim M_t(\check{\beta}_{t-1}^n,\cdot)$ for $n\in[N]$.
+
+## Backward Markov kernels and weight functions
+We then choose a sequence of backward kernels $(L_t)_{t=0}^{T-1}$ to ensure that importance weights are tractable. We employ the standard choice of having $L_{t-1}$ as the time reversal of $M_t$ [@jarzynski_1997; @neal2001annealed]. This leads to the weight function $w_t(\beta_{t-1})=\gamma_t(\beta_{t-1})/\gamma_{t-1}(\beta_{t-1})$. 
+For numerical stability reasons, we will implement the weight function in the logarithmic scale instead of the natural scale. 
+Using the form of $\gamma_t$, we can write the log-weight function as
+$$ 
+\log w_t(\beta_{t-1}) = \log p(y_{(bt-b+1):bt}|x_{(bt-b+1):bt},\beta_{t-1}).
+$$
+This specific expression is implemented below in our definition of `logweight_function`. This function takes as arguments `obs_start` and `obs_end` specifying the observation indices $b(t-1)$ and $bt$, and a $d\times N$ matrix `beta` containing $N$ sets of regression coefficients $\beta_{t-1}^n\in\mathbb{R}^d, n\in[N]$ before the forward Markov kernel $M_t$ is applied. 
+
+```{r logweights}
+logweight_function <- function(obs_start, obs_end, beta){
+  logweights <- loglikelihood(beta, X[(obs_start+1):(obs_end),], Y[(obs_start+1):(obs_end)])
+  logweights[is.na(logweights)] <- -Inf
+  return(logweights)
+}
+```
+
+## Weight computations and resampling 
+To compute normalized weights $w_t^n\propto w_t(\beta_{t-1}^n), n\in[N]$ satisfying $\sum_{n=1}^Nw_t^n=1$, we apply the log-sum-exp trick to prevent numerical under/over-flow. Our implementation of the `normalize_weights` function also computes the log-mean weights $\log(N^{-1}\sum_{n=1}^N w_t(\beta_{t-1}^n))$, which is an estimator of 
+$$
+\log Z_t - \log Z_{t-1} =
+\log\left(\int_{\mathbb{R}^d}w_t(\beta_{t-1})\pi_{t-1}(d\beta_{t-1})\right).
+$$
+```{r normweights}
+normalize_weights <- function(logweights){
+  maxlogweights <- max(logweights)
+  weights <- exp(logweights - maxlogweights)
+  normweights <- weights / sum(weights)
+  logmeanweights <- log(mean(weights)) + maxlogweights
+  return(list(weights = normweights, logmean = logmeanweights))
+}
+```
+
+To measure the variability of the normalized weights $(w_t^n)_{n\in[N]}$, we define a function `compute_ess` to compute the effective sample size (ESS) criterion $\mathrm{ESS}_t=\{\sum_{n=1}^N(w_t^n)^2\}^{-1}$ [@kong1994sequential]. The ESS lies between $1$ to $N$, achieving the lower bound when the weights degenerates to a single sample, and the upper bound in the case of uniform weights. 
+
+```{r ess}
+compute_ess <- function(normweights){
+  ess <- 1 / sum(normweights^2)
+  return(ess)
+}
+```
+
+To mitigate the issue of weight degeneracy, we perform an operation known as resampling. This allows samples with low weights to be discarded, and samples with large weights to be duplicated. Below, we implement a simple scheme called multinomial resampling, which involves drawing ancestor indices $(a_{t-1}^n)_{n\in[N]}$ independently from the Categorical distribution on $[N]$ with probabilities given by the normalized weights $(w_t^n)_{n\in[N]}$. The resampled particles are then obtained by setting $\check{\beta}_{t-1}^n=\beta_{t-1}^{a_{t-1}^n}$ for $n\in[N]$. 
+
+```{r resampling}
+resampling <- function(normweights){
+  N <- length(normweights)
+  ancestors <- sample(x = 1:N, size = N, prob = normweights, replace = TRUE)
+  return(ancestors)
+}
+```
+
+## Sequential Monte Carlo sampler
+We are now in a position to construct an SMCS by assembling the components defined above. For illustration, we choose batches of size $b=10$ which results in $T=m/b=100$ bridging distributions, $N=200$ samples and the number of HMC iterations `niterations` at each step as one. From some preliminary runs, this requires a few seconds of compute time for this problem. One could experiment with various choices and see how it impacts the algorithmic performance and run-time. The algorithm returns a $d\times N$ matrix `particles` containing samples $(\beta_T^n)_{n\in[N]}$ approximating $\pi_T$, a numeric vector `log_normconst` of log-normalizing constant estimates $(\log Z_t^N)_{t\in[T]}$, a numeric vector `ess` of effective sample sizes, and a numeric vector `acceptrate` monitoring the acceptance rate of HMC at each step. 
+
+```{r smc}
+# algorithmic tuning parameters
+b <- 10
+T <- m / b
+N <- 200
+niterations <- 1
+
+# initialization
+particles <- rprior(N)
+log_normconst <- rep(0, T + 1)
+log_ratio_normconst <- 0
+ess <- rep(0, T + 1)
+ess[1] <- N
+acceptrate <- rep(0, T)
+
+# intermediate steps
+for (t in 1:T){
+  # compute log-weights
+  logweights <- logweight_function(b*(t-1), b*t, particles)
+  
+  # normalize weights
+  normalized <- normalize_weights(logweights)
+  normweights <- normalized$weights 
+  logmeanweights <- normalized$logmean
+  
+  # compute effective sample size
+  ess[t+1] <- compute_ess(normweights)
+  
+  # compute normalizing constant estimate
+  log_ratio_normconst <- log_ratio_normconst + logmeanweights
+  log_normconst[t+1] <- log_ratio_normconst
+  
+  # multinomial resampling
+  ancestors <- resampling(normweights)
+  particles <- particles[, ancestors, drop=F]
+  
+  # HMC iterations  
+  logtarget <- function(beta) loggamma(beta, X[1:(b*t), ], Y[1:(b*t)])
+  gradlogtarget <- function(beta) gradloggamma(beta, X[1:(b*t), ], Y[1:(b*t)])
+  for (i in 1:niterations){
+    hmc_result <- hmc_kernel(particles, logtarget, gradlogtarget)
+    particles <- hmc_result$beta
+  }
+  acceptrate[t] <- hmc_result$acceptrate
+}
+```
+
+Figures such as histograms and scatter plots of `particles` can be used to visualize our approximation of the posterior distribution of $\beta$.
+
+```{r pairs}
+hist(particles[1, ], probability = TRUE, xlab = 'beta0', main = 'Histogram of beta0')
+pairs(t(particles))
+```
+
+Plotting `log_normconst` allows us to observe the time evolution of log-normalizing constant estimates. The last element is an estimate of the log-marginal likelihood of the data set. 
+
+```{r smc-logz}
+plot(0:T, log_normconst, type = 'l', xlab = 'step', ylab = 'estimate')
+cat('Log-marginal likelihood estimate:', log_normconst[T+1])
+```
+
+Next, we plot the ESS percentage to inspect the degree of weight degeneracy over the time steps. Notice that the ESS drops sharply in the beginning, and remains fairly high for most steps later on. One could experiment with smaller batch sizes $b$ to reduce weight degeneracy. 
+
+```{r smc-ess}
+plot(0:T, ess * 100 / N, type = 'l', xlab = 'step', ylab = 'ESS%', ylim = c(0,100))
+```
+
+Lastly, we inspect the acceptance rates of HMC. Low/high acceptance rates suggest that we should decrease/increase the tuning parameter `stepsize` defining `leapfrog` and hence `hmc_kernel`.
+
+```{r smc-acceptrate}
+plot(1:T, acceptrate, type = 'l', xlab = 'step', ylab = 'Acceptance rate', ylim = c(0,1))
+```
+
+# References

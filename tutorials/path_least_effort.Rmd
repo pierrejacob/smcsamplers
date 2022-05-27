@@ -1,0 +1,311 @@
+---
+title: "Logistic regression: Path of least coding effort"
+output: html_document
+bibliography: references.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data set and prior specification
+We begin by loading the forest cover type data set [@blackard2000comparison] which has been pre-processed. The data contain cartographic information (relating to altitude, slope, azimuth etc) for $30m$ by $30m$ cells in northern Colorado. The goal is to predict the type of cover (originally spruce/fir, lodgepole pine, Ponderosa pine, cottonwood/willow, spruce/fir and aspen or Douglas-fir, and in @collobert2002parallel this was simplified to lodgepole pine versus the other categories combined). We will fit a Bayesian logistic regression model to analyze this data set with $m=1000$ observations. In the following, we denote $x=(x_1,\ldots,x_m)\in\mathbb{R}^{m\times d}$ as the design matrix and $y=(y_1,\ldots,y_m)\in\{0,1\}^m$ as the observations. 
+
+```{r dataset}
+load("covtype.processed.RData")
+m <- 1e3 # number of training datapoints
+d <- dim(trainingset)[2] - 1 # number of covariates
+Y <- trainingset[1:m,1] - 1
+X <- trainingset[1:m,2:(d+1)]
+```
+
+Next, we standardize the covariates and add a column of ones to the design matrix $x$ to account for the regression intercept.
+
+```{r standardize}
+X <- scale(X)
+X <- cbind(1, X)
+d <- d + 1
+```
+
+We then specify a prior distribution for regression coefficients $\beta\in\mathbb{R}^d$ using a Normal distribution with mean vector $b=0_d$ and covariance matrix $B=10 I_d$. We also define a function `rprior` that returns $N\in\mathbb{N}$ random samples from the prior distribution.
+
+```{r prior}
+b <- matrix(0, nrow = d, ncol = 1)
+B <- diag(10, d, d)
+rprior <- function(N){
+  return(sqrt(10) * matrix(rnorm(d*N), nrow = d))
+}
+```
+
+# Polya-Gamma Gibbs sampler
+To sample from the posterior distribution of the regression coefficients $\beta$, we can use the Polya-Gamma Gibbs (PGG) sampler of @polson2013bayesian. Below, we define a function `pgg_kernel` that samples from the PGG Markov kernel. This involves sampling Polya-Gamma latent variables $\omega\in\mathbb{R}_+^n$ from Polya-Gamma distributions that depend on $\beta$, and regression coefficients $\beta$ from a Normal distribution with mean and covariance that depend on $\omega$. We rely on the function `pgdraw` from the `pgdraw` package to sample from the Polya-Gamma distribution. To speed up computation, we pass a list `precomputed`, which contains quantities that depend on the data set and prior distribution computed using the function `pgg_precomputation`. 
+
+```{r pgg}
+library(pgdraw)
+
+pgg_kernel <- function(beta, precomputed){
+  # sample PG variables conditional on beta
+  omega_parameter <- abs(precomputed$X %*% beta) # PG exponential tilting parameter
+  omega <- pgdraw(1, omega_parameter)
+  
+  # sample beta conditional on PG variables 
+  beta_precision <- t(precomputed$X) %*% (omega * precomputed$X) + precomputed$invB
+  beta_cov <- chol2inv(chol(beta_precision))
+  beta_mean <- beta_cov %*% precomputed$XTkappaplusinvBtimesb
+  beta <- beta_mean + t(chol(beta_cov)) %*% rnorm(d)
+  return(beta)
+}
+
+pgg_precomputation <- function(Y, X, b, B){
+  invB <- solve(B)
+  invBtimesb <- invB %*% b
+  Ykappa <- matrix(Y - rep(0.5, length(Y)), ncol = 1)
+  XTkappa <- t(X) %*% Ykappa
+  XTkappaplusinvBtimesb <- XTkappa + invBtimesb
+  return(list(X = X, invB = invB, XTkappaplusinvBtimesb = XTkappaplusinvBtimesb))
+}
+```
+
+# Components of sequential Monte Carlo sampler
+We now specify various algorithmic components that form a sequential Monte Carlo sampler (SMCS) [@del2006sequential]. 
+
+## Path of distributions and forward Markov kernels
+First, we select a path of distributions $(\pi_t)_{t=0}^T$ with the posterior distribution of $\beta$ as its last element. To reduce implementation effort, we will introduce a path so that only slight modifications to the above PGG sampler are needed to obtain a forward Markov kernel $M_t$ that targets each $\pi_t$. 
+
+Following @rischard2018unbiased, we define $\pi_t$ as the posterior distribution of $\beta$ associated to the design matrix $\lambda_t x$ for $\lambda_t\in[0,1]$. 
+This choice is valid as it clearly recovers the desired posterior distribution of $\beta$ for $\lambda_T=1$. By passing $\lambda_t x$ as the design matrix to `pgg_precomputation` and hence `pgg_kernel`, we immediately have an implementation of the PGG sampler targeting any $\pi_t$. Running several iterations of the PGG sampler for $\pi_t$ to move samples $(\check{\beta}_{t-1}^n)_{n\in[N]}$ from step $t-1$ to a new set of samples $(\beta_{t}^n)_{n\in[N]}$ approximating $\pi_t$ defines a $\pi_t$-invariant forward Markov kernel $M_t$, i.e. $\beta_{t}^n\sim M_t(\check{\beta}_{t-1}^n,\cdot)$ for $n\in[N]$. When $\lambda_0=0$, the corresponding likelihood function reduces to $2^{-m}$ for all $\beta$, where $m$ is the number of observations. Hence the initial distribution $\pi_0$ is equal to the prior distribution of $\beta$, with an associated normalizing constant of $Z_0=2^{-m}$. To initialize our SMCS with draws $\beta_0^n\sim\pi_0,n\in[N]$, we use the `rprior` function defined earlier. 
+
+## Backward Markov kernels and weight functions
+Next, we have to select a sequence of backward kernels $(L_t)_{t=0}^{T-1}$ to ensure that importance weights are tractable. We employ the standard choice of having $L_{t-1}$ as the time reversal of $M_t$ [@jarzynski_1997; @neal2001annealed]. This leads to the weight function $w_t(\beta_{t-1})=\gamma_t(\beta_{t-1})/\gamma_{t-1}(\beta_{t-1})$, where $\gamma_t$ denotes the unnormalized posterior density of $\pi_t$ with normalizing constant $Z_t$. For numerical stability reasons, we will implement the weight function in the logarithmic scale instead of the natural scale. 
+Using the form of $\gamma_t$, we can write the log-weight function as
+$$ 
+\log w_t(\beta_{t-1}) = (\lambda_t-\lambda_{t-1}) \sum_{i=1}^my_i x_i^\top\beta_{t-1} - \sum_{i=1}^m\left\lbrace \log(1+\exp(\lambda_t\beta_{t-1}^\top x_i)) -
+\log(1+\exp(\lambda_{t-1}\beta_{t-1}^\top x_i))\right\rbrace.
+$$
+This specific expression is implemented below in our definition of `logweight_function`. This function takes as arguments `lambda_current` and `lambda_next` specifying the successive distributions $\pi_{t-1}$ and $\pi_t$, and a $d\times N$ matrix `beta` containing $N$ sets of regression coefficients $\beta_{t-1}^n\in\mathbb{R}^d, n\in[N]$ before the forward Markov kernel $M_t$ is applied. 
+
+```{r logweights}
+logweight_function <- function(lambda_current, lambda_next, beta){
+  xbeta <- X %*% beta
+  Yxbeta_sums <- colSums(Y * xbeta)
+  logweights <- (lambda_next - lambda_current) * Yxbeta_sums - colSums(log(1 + exp(lambda_next * xbeta)) - log(1 + exp(lambda_current * xbeta)))
+  logweights[is.na(logweights)] <- -Inf
+  return(logweights)
+}
+```
+
+## Weight computations and resampling 
+To compute normalized weights $w_t^n\propto w_t(\beta_{t-1}^n), n\in[N]$ satisfying $\sum_{n=1}^Nw_t^n=1$, we apply the log-sum-exp trick to prevent numerical under/over-flow. Our implementation of the `normalize_weights` function also computes the log-mean weights $\log(N^{-1}\sum_{n=1}^N w_t(\beta_{t-1}^n))$, which is an estimator of 
+$$
+\log Z_t - \log Z_{t-1} =
+\log\left(\int_{\mathbb{R}^d}w_t(\beta_{t-1})\pi_{t-1}(d\beta_{t-1})\right).
+$$
+```{r normweights}
+normalize_weights <- function(logweights){
+  maxlogweights <- max(logweights)
+  weights <- exp(logweights - maxlogweights)
+  normweights <- weights / sum(weights)
+  logmeanweights <- log(mean(weights)) + maxlogweights
+  return(list(weights = normweights, logmean = logmeanweights))
+}
+```
+
+To measure the variability of the normalized weights $(w_t^n)_{n\in[N]}$, we define a function `compute_ess` to compute the effective sample size (ESS) criterion $\mathrm{ESS}_t=\{\sum_{n=1}^N(w_t^n)^2\}^{-1}$ [@kong1994sequential]. The ESS lies between $1$ to $N$, achieving the lower bound when the weights degenerates to a single sample, and the upper bound in the case of uniform weights. 
+
+```{r ess}
+compute_ess <- function(normweights){
+  ess <- 1 / sum(normweights^2)
+  return(ess)
+}
+```
+
+To mitigate the issue of weight degeneracy, we perform an operation known as resampling. This allows samples with low weights to be discarded, and samples with large weights to be duplicated. Below, we implement a simple scheme called multinomial resampling, which involves drawing ancestor indices $(a_{t-1}^n)_{n\in[N]}$ independently from the Categorical distribution on $[N]$ with probabilities given by the normalized weights $(w_t^n)_{n\in[N]}$. The resampled particles are then obtained by setting $\check{\beta}_{t-1}^n=\beta_{t-1}^{a_{t-1}^n}$ for $n\in[N]$. 
+
+```{r resampling}
+resampling <- function(normweights){
+  N <- length(normweights)
+  ancestors <- sample(x = 1:N, size = N, prob = normweights, replace = TRUE)
+  return(ancestors)
+}
+```
+
+## Non-adaptive SMCS
+We are now in a position to construct a SMCS by assembling the components defined above. We first consider the simple case where we specify the number of bridging distributions $T$ and the linear sequence $\lambda_t=t/T, t\in[T]$. For illustration, we choose $T=50$ steps, $N=200$ samples and the number of PGG sampler iterations `niterations` at each step as one. From some preliminary runs, this requires a few seconds of compute time for this problem. One could experiment with various choices and see how it impacts the algorithmic performance and run-time. 
+The algorithm returns a $d\times N$ matrix `particles` containing samples $(\beta_T^n)_{n\in[N]}$ approximating $\pi_T$, a numeric vector `log_normconst` of log-normalizing constant estimates $(\log Z_t^N)_{t\in[T]}$, and a numeric vector `ess` of effective sample sizes. 
+
+```{r smc}
+# algorithmic tuning parameters
+T <- 50 # number of intermediate distributions
+lambda_schedule <- seq(0, 1, length.out = T+1) # indexes intermediate distributions 
+N <- 200 # number of particles
+niterations <- 1 # number of MCMC moves per SMCS step
+
+# initialization
+particles <- rprior(N)
+log_ratio_normconst <- - m * log(2)
+log_normconst <- rep(0, T + 1)
+log_normconst[1] <- - m * log(2)
+ess <- rep(0, T + 1)
+ess[1] <- N
+
+# intermediate steps
+for (t in 1:T){
+  # compute log-weights
+  logweights <- logweight_function(lambda_schedule[t], lambda_schedule[t+1], particles)
+  
+  # normalize weights
+  normalized <- normalize_weights(logweights)
+  normweights <- normalized$weights 
+  logmeanweights <- normalized$logmean
+  
+  # compute effective sample size
+  ess[t+1] <- compute_ess(normweights)
+  
+  # compute normalizing constant estimate
+  log_ratio_normconst <- log_ratio_normconst + logmeanweights
+  log_normconst[t+1] <- log_ratio_normconst
+  
+  # multinomial resampling
+  ancestors <- resampling(normweights)
+  particles <- particles[, ancestors, drop=F]
+  
+  # Polya-Gamma Gibbs sampler iterations
+  pgg_precomputed <- pgg_precomputation(Y, lambda_schedule[t+1] * X, b, B)
+  for (i in 1:niterations){
+    particles <- apply(particles, 2, function(v) pgg_kernel(v, pgg_precomputed))
+  }
+}
+```
+
+Figures such as histograms and scatter plots of `particles` can be used to visualize our approximation of the posterior distribution of $\beta$.
+
+```{r pairs}
+hist(particles[1, ], probability = TRUE, xlab = 'beta0', main = 'Histogram of beta0')
+pairs(t(particles))
+```
+
+Plotting `log_normconst` allows us to observe the time evolution of log-normalizing constant estimates. The last element is an estimate of the log-marginal likelihood of the data set. 
+
+```{r smc-logz}
+plot(0:T, log_normconst, type = 'l', xlab = 'step', ylab = 'estimate')
+cat('Log-marginal likelihood estimate:', log_normconst[T+1])
+```
+
+Next, we plot the ESS percentage to inspect the degree of weight degeneracy over the time steps. Notice that the ESS drops sharply in the beginning, and remains high for most steps later on. This suggests that we should increase $\lambda_t$ slower than linearly at the start, and faster than linearly towards the end. In the following, we will show how to do this using an adaptive scheme. 
+
+```{r smc-ess}
+plot(0:T, ess * 100 / N, type = 'l', xlab = 'step', ylab = 'ESS%', ylim = c(0,100))
+```
+
+## Adaptive SMCS
+We now describe a common procedure that specifies $T$ and $(\lambda_t)_{t\in[T]}$ adaptively. Suppose we are at step $t-1$ and $\pi_{t-1}$ has been determined by some $\lambda_{t-1}\in[0,1)$. To keep the ESS constant over time, we seek $\lambda_t\in(\lambda_{t-1},1]$ so that $\mathrm{ESS}_t(\lambda_t)$ is equal to a desired level $\kappa N$, for some criterion $\kappa\in(0,1)$ that we will specify. Below, we implement a function `search_lambda` that performs a binary search on $[\lambda_{t-1},1]$ to solve for $\lambda_t$. It takes as input arguments a numeric value `lambda_current` specifying $\lambda_{t-1}$, a function `ess_function` that allows us to evaluate $\lambda_t\mapsto\mathrm{ESS}_t(\lambda_t)$, and a numeric value `objective` specifying the desired ESS $\kappa N$. 
+For efficiency, we should write `ess_function` in a manner that precomputes terms involving the samples $(\beta_{t-1}^n)_{n\in[N]}$ as they do not depend on the choice of $\lambda_t$. Two other optional arguments `maxsteps` and `tolerance` control the maximum number of bisection steps and the error tolerance of the binary search. 
+
+```{r bisection}
+# binary search
+search_lambda <- function(lambda_current, ess_function, objective, maxsteps = 1000, tolerance = 1e-2){
+  if ((ess_function(lambda_current) < objective)|| ess_function(1) > objective){
+    print("Problem: there is no solution to the binary search")
+  }
+  attempt <- 1
+  current_size <- (1 - lambda_current)/2
+  ess_attempt <- ess_function(attempt)
+  istep <- 0
+  while (!(ess_attempt >= objective && ess_attempt < objective+tolerance) && (istep < maxsteps)){
+    istep <- istep + 1
+    if (ess_attempt > objective){
+      attempt <- attempt + current_size
+      ess_attempt <- ess_function(attempt)
+      current_size <- current_size / 2
+    } else {
+      attempt <- attempt - current_size
+      ess_attempt <- ess_function(attempt)
+      current_size <- current_size / 2
+    }
+  }
+  lambda_next <- attempt
+  return(lambda_next)
+}
+```
+
+We may now construct an adaptive SMCS by assembling the above components. For illustrative purpose, we set the ESS criterion as $\kappa=0.5$, the number of samples as $N=200$ and the number of PGG iterations `niterations` at each step as one. The algorithmic run-time is now random as the number of bridging distributions $T$ is itself random, and dependent on the choice of $\kappa$. One could experiment with various values of $\kappa$ and $N$ to see how it changes the behavior of $T$. The algorithmic outputs `particles`, `log_normconst` and `ess` are the same as the non-adaptive sampler. 
+
+```{r asmc}
+# algorithmic tuning parameters
+kappa <- 0.5
+N <- 200
+niterations <- 1
+
+# initialization
+particles <- rprior(N)
+log_ratio_normconst <- - m * log(2)
+log_normconst <- - m * log(2) 
+ess <- N
+lambda_current <- 0
+lambda_schedule <- lambda_current
+
+# intermediate steps
+while (lambda_current < 1){
+  # search for next lambda
+  xbeta <- X %*% particles
+  Yxbeta_sums <- colSums(Y * xbeta)
+  ess_next <- function(lambda){
+    logweights_next <- (lambda - lambda_current) * Yxbeta_sums - colSums(log(1 + exp(lambda * xbeta)) - log(1 + exp(lambda_current * xbeta)))
+    logweights_next[is.na(logweights_next)] <- -Inf
+    normweights_next <- normalize_weights(logweights_next)$weights
+    return(compute_ess(normweights_next))
+  }
+  if (ess_next(1) > kappa * N){
+    lambda_next <- 1
+  } else {
+    lambda_next <- search_lambda(lambda_current, ess_next, kappa * N)
+  }
+  
+  # compute log-weights
+  logweights <- logweight_function(lambda_current, lambda_next, particles)
+  
+  # normalize weights
+  normalized <- normalize_weights(logweights)
+  normweights <- normalized$weights 
+  logmeanweights <- normalized$logmean
+  
+  # compute effective sample size
+  ess <- c(ess, compute_ess(normweights))
+  
+  # compute normalizing constant
+  log_ratio_normconst <- log_ratio_normconst + logmeanweights
+  log_normconst <- c(log_normconst, log_ratio_normconst)
+  
+  # multinomial resampling
+  ancestors <- resampling(normweights)
+  particles <- particles[, ancestors, drop=F]
+  
+  # Polya-Gamma sampler iterations
+  pgg_precomputed <- pgg_precomputation(Y, lambda_next * X, b, B)
+  for (i in 1:niterations){
+    particles <- apply(particles, 2, function(v) pgg_kernel(v, pgg_precomputed))
+  }
+  
+  # store lambda schedule
+  lambda_current <- lambda_next
+  lambda_schedule <- c(lambda_schedule, lambda_current)
+}
+```
+
+One can inspect `particles` and `log_normconst` to check that we obtain similar results as before. Below, we print the number of bridging distributions $T$ and compare the adaptively-determined sequence $(\lambda_t)_{t\in[T]}$ to the linear schedule. 
+
+```{r adaptive-lambda}
+T <- length(lambda_schedule) - 1
+cat("Number of bridging distributions:", T)
+
+plot(0:T, lambda_schedule, xlab = 'step', ylab = 'lambda')
+lines(0:T, seq(0, 1, length.out = T+1), col = 'red')
+```
+
+Lastly, as a sanity check, we plot the ESS percentage to verify that it is maintained at the desired level of $\kappa=50\%$, with the exception of the initial and terminal steps. 
+
+```{r adaptive-ess}
+plot(0:T, ess * 100 / N, type = 'l', xlab = 'step', ylab = 'ESS%', ylim = c(0,100))
+```
+
+# References
